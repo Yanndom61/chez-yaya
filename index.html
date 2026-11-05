@@ -6110,9 +6110,9 @@ Object.assign(AL_TAGS,{
   virgmo:[],shrley:[],gntonic:[],tropic:[],cucum:[],
   vr1:['sulfites'],vr2:['sulfites'],vr3:['sulfites'],vb1:['sulfites'],vb2:['sulfites'],vb3:['sulfites'],vro1:['sulfites'],vro2:['sulfites'],vro3:['sulfites'],
   br1:['gluten'],br2:['gluten'],br3:['gluten'],br4:['gluten'],
-  vinchaud:['sulfites'],laitpoule:['lait','oeuf'],citronnade:[],theglace:[]
+  vinchaud:['sulfites'],laitpoule:['lait','oeufs'],citronnade:[],theglace:[]
 });
-for(const k of Object.keys(DISH)){ const d=DISH[k]; if(!d.al) d.al=AL_TAGS[k]||[]; if(d.veg==null) d.veg=!Object.keys(d.rec).some(i=>ING[i]&&ING[i].meat); if(d.gf==null) d.gf=!d.al.includes('gluten'); }
+for(const k of Object.keys(DISH)){ const d=DISH[k]; if(!d.al) d.al=AL_TAGS[k]||[]; d.al=d.al.map(a=>a==='oeuf'?'oeufs':a).filter(a=>ALG[a]); /* v8.1 : clé allergène inconnue → plantait algChips (panneau boissons figé) */ if(d.veg==null) d.veg=!Object.keys(d.rec).some(i=>ING[i]&&ING[i].meat); if(d.gf==null) d.gf=!d.al.includes('gluten'); }
 /* parfums de glace (affichage / choix) */
 const GLACE_PARF=['Vanille de Madagascar','Chocolat noir','Fraise de saison','Pistache','Caramel beurre salé','Citron vert','Café arabica','Noix de coco','Menthe-chocolat','Passion','Spéculoos','Yuzu'];
 const glaceLab=(id)=>DISH[id]&&DISH[id].ice?(' · '+(DISH[id].boules||1)+' boule'+(DISH[id].boules>1?'s':'')+' au choix ('+GLACE_PARF.slice(0,4).join(', ')+'…)'):'';
