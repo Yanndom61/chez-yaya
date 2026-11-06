@@ -5516,7 +5516,7 @@ function xExtend(pl,side,dp){ const W=pl.W,H=pl.H; const nW=(side==='right'||sid
 function xWhy(day,ph){ if(day<=dayNum()) return 'les travaux commencent au plus tôt demain'; const b=upgBusy(day,ph); if(b) return b; if(XS().sched.some(x=>!(day+ph-1<x.start||day>x.start+x.ph-1))) return 'une autre extension est déjà prévue sur ces dates'; return ''; }
 function xOrder(day){ const pl=S.plan, side=UX.s, dp=UX.dp, pur=UX.p;
   const m2=xM2(pl,side,dp), c=xPrice(pl,side,dp,pur), ph=xDays(m2,pur);
-  if(c>S.cash) return {ok:false,msg:'Trésorerie insuffisante : il manque '+fm(c-S.cash)+' (coût '+fm(c)+'). Choisissez une profondeur plus petite ou financez-vous par un emprunt.'};
+  if(c>S.cash) return {ok:false,msg:'Trésorerie insuffisante : il manque '+fm(c-S.cash)+' (coût '+fm(c)+'). Choisissez une taille plus petite ou financez-vous par un emprunt.'};
   const w=xWhy(day,ph); if(w) return {ok:false,msg:'Impossible à cette date : '+w+'. Choisissez une autre date.'};
   spend(c,'invest'); XS().sched.push({id:nid(),start:day,ph,side,dp,pur,m2,c}); let n=0; try{ n=wkAfterPlan(); }catch(e){ console.error(e); }
   return {ok:true,msg:'Extension de '+m2+' m² ('+XPUR[pur].n.toLowerCase()+') programmée du '+dateShort(day)+' au '+dateShort(day+ph-1)+' · '+fm(c)+'.'+(n?' '+n+' client(s) appelé(s) (à emporter -10 % ou annulation : voir le journal).':'')}; }
@@ -5535,7 +5535,7 @@ PANELS.ext={t:()=>'📐 Agrandir le local',f(){ const pl=S.plan, side=UX.s, dp=U
    +'<h3>3 · Profondeur</h3><div class="btnrow" style="flex-wrap:wrap">'+[1,2,3,4,6,8].map(k=>btn(k+' m · '+fm(xPrice(pl,side,k,pur)),'extd',k,null,k===dp?'primary sm':'ghost sm')).join('')+'</div></div>';
   h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+((side==='right'||side==='left')?(pl.W+dp)+'×'+pl.H:pl.W+'×'+(pl.H+dp))+'<br>Coût : <b>'+fm(c)+'</b> · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+(pur==='cuisine'?'cuisine fermée, ':'')+'gros travaux : plus de repas sur place, prime et congés selon la règle des travaux)</p>'
    +'<label style="display:flex;gap:8px;align-items:center"><span>Quand ?</span><select class="sl" data-sel="extwhen">'+ds.map(x=>'<option value="'+x[0]+'"'+(x[0]===UX.d?' selected':'')+(x[2]?'':' disabled')+'>'+x[1]+'</option>').join('')+'</select></label>'
-   +(c>S.cash?'<p class="bad">Trésorerie insuffisante : il manque '+fm(c-S.cash)+'. Prenez une profondeur plus petite ou un emprunt (onglet Finances).</p>':'')
+   +(c>S.cash?'<p class="bad">Trésorerie insuffisante : il manque '+fm(c-S.cash)+'. Choisissez une taille plus petite ou un emprunt (onglet Finances).</p>':'')
    +btn('Commander l’extension · '+fm(c),'extgo',null,null,'primary')+'</div>';
   const X=XS(); if(X.sched.length) h+='<div class="card"><h3>Programmées</h3>'+X.sched.map(x=>'<p>'+XPUR[x.pur].e+' +'+x.m2+' m² · '+dateShort(x.start)+' → '+dateShort(x.start+x.ph-1)+(x.started?' · en cours':'')+'</p>').join('')+'</div>'; return h; }};
 document.addEventListener('change',e=>{ const el=e.target; if(el&&el.dataset&&el.dataset.sel==='extwhen') UX.d=+el.value; });
@@ -6434,15 +6434,10 @@ fixedCosts=function(){ return v9Total()? v9Rent() : v9Rent()+v9Utilities(); };
 { const _ed=endDay; endDay=function(){ if(v9Total()){ S.tempDish=false; S.staff=S.staff.filter(s=>!s.tmp); } return _ed.apply(this,arguments); }; }
 { const _tc=v8TravCard; v8TravCard=function(){ const h=_tc(); if(!h) return h; return h.replace('Boîte vocale active (nouvelles résas bloquées).','Boîte vocale active (nouvelles résas bloquées).<br>💧⚡🔥 Eau, électricité, gaz : <b>0 €</b> (compteurs coupés) · 🚫 aucun intérimaire · 💶 salaires de l’équipe inchangés · loyer '+fm(v9Rent())+'/j.'); }; }
 
-/* ---------------- EXTENSIONS SUPPLÉMENTAIRES ---------------- */
+/* ---------------- EXTENSIONS SUPPLÉMENTAIRES (helpers ; UI → w9_ext.js) ---------------- */
 const X_FREE_M2=100; /* base 10×10 m offerte */
 const xFreeLeft=()=>Math.max(0,X_FREE_M2-xAdded());
 xPrice=function(pl,side,dp,pur){ const m2=xM2(pl,side,dp); const paid=Math.max(0,m2-xFreeLeft()); if(paid<=0) return 0; return Math.round(paid*xRate(pl,pur,m2)/10)*10; };
-xCard=function(){ const pl=S.plan, X=XS(), tot=X.done.reduce((a,x)=>a+x.m2,0), fl=xFreeLeft();
-  return card('📐 Extensions supplémentaires · '+pl.W+'×'+pl.H+' m','<p class="muted">Ajoutez des m² (salle, terrasse, cuisine, réserve, toilettes) en choisissant l’<b>usage prévu</b> et la <b>façade</b>, puis aménagez-les dans l’éditeur de plan. <b>Base 10×10 m offerte</b> : '+(fl>0?'encore <b>'+fl+' m² gratuits</b>':'quota gratuit utilisé')+' ; au-delà, payant.'+(tot?' Déjà ajouté : <b>+'+tot+' m²</b>.':'')+(X.sched.length?' 🏗️ '+X.sched.length+' extension(s) programmée(s).':'')+'</p>'+btn('Extensions supplémentaires','extopen',null,null,'primary')); };
-{ const P=PANELS.ext, _f=P.f; P.t=()=>'📐 Extensions supplémentaires'; P.f=function(){ let h=_f.call(this); const fl=xFreeLeft();
-  h=h.replace(/<p class="muted">Prix de base du local[\s\S]*?<\/p>/,'<p class="muted">🎁 <b>Base 10×10 m (100 m²) offerte</b> : il reste <b>'+fl+' m² gratuits</b>. Au-delà : '+XPM[S.plan.pid||0]+' €/m² de base (×'+XPUR[UX.p].m+' pour '+XPUR[UX.p].n.toLowerCase()+'), de plus en plus cher avec la surface ajoutée.</p>');
-  return h.replace(/Agrandir le local/g,'Extensions supplémentaires'); }; }
 
 /* ---------------- SONNETTE DE CUISINE (déjà installée) ---------------- */
 const BELL9={last:0,n:0};
@@ -6472,6 +6467,142 @@ function v9GlaceCard(){ const tot=S.iceTot||{}; const row=p=>'<span class="chip'
 /* correctif v8 : la formation « travaux » durait jusqu'au matin de la réouverture → l'équipe semblait absente et
    l'intérim était appelé pour tout le monde. On clôt la formation dès le début de la journée de réouverture. */
 { const _ds=v6DayStart; v6DayStart=function(){ try{ const t0=(dayNum()-1)*1440+DAYSTART; let n=0; for(const s of S.staff){ if(s.trn&&s.trn.v8&&s.trn.until<=t0+1){ const cap=(S.mich&&S.mich.star)?20:10; s.skill=clamp(s.skill+1,1,cap); s.trn=null; n++; } } if(n){ if(S.vm) S.vm.on=0; note('🎉 Réouverture ! '+n+' employé(s) ont progressé pendant les travaux (+1 niveau).','good'); } }catch(e){ console.error(e); } return _ds(); }; }
+
+
+/* ########## w9_ext.js ########## */
+/* =====================================================================
+   V9b · Extensions DANS Travaux : carré 10×10 gratuit, au-delà payant,
+   aperçu « Voir le plan avant de lancer », plus de Profondeur.
+   ===================================================================== */
+UX.mode = UX.mode || 'sq10';
+if(UX.paidDp==null) UX.paidDp = 6;
+const X_PAID_DPS = [4, 6, 8, 10, 12, 15];
+
+function xLen(pl, side){ return Math.max(1, (side==='right'||side==='left') ? (pl.H-2) : (pl.W-2)); }
+function xDpForM2(pl, side, m2){ return Math.max(1, Math.round(Math.max(1, m2) / xLen(pl, side))); }
+/* Carré 10×10 : on vise 100 m² (quota gratuit). Si la façade est longue,
+   profondeur 10 donne un « vrai » carré 10×N ; sinon on calcule la profondeur. */
+function xSq10Dp(pl, side){
+  const fl = Math.max(0, (typeof xFreeLeft==='function' ? xFreeLeft() : 100));
+  const target = fl > 0 ? Math.min(X_FREE_M2, fl) : X_FREE_M2;
+  const byM2 = xDpForM2(pl, side, target);
+  /* préfère profondeur 10 si elle reste proche de 100 m² (±30 %) */
+  const m10 = xM2(pl, side, 10);
+  if(m10 >= target*0.7 && m10 <= target*1.4) return 10;
+  return byM2;
+}
+function xCurDp(pl){ return UX.mode==='sq10' ? xSq10Dp(pl, UX.s) : (UX.paidDp||6); }
+function xDimLabel(pl, side, dp){
+  const nW = (side==='right'||side==='left') ? pl.W+dp : pl.W;
+  const nH = (side==='top'||side==='bottom') ? pl.H+dp : pl.H;
+  return nW+'×'+nH;
+}
+function xPaintPrev(cv, pl, base){
+  try{
+    const C=compilePlan(pl), c=cv.getContext('2d');
+    const ww=pl.W*CELL+2*PAD, wh=pl.H*CELL+2*PAD;
+    const sc=Math.min(cv.width/ww, cv.height/wh);
+    c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,cv.width,cv.height);
+    c.fillStyle='#2b1a16'; c.fillRect(0,0,cv.width,cv.height);
+    c.setTransform(sc,0,0,sc,(cv.width-ww*sc)/2,(cv.height-wh*sc)/2);
+    if(typeof paintPlanFull==='function') paintPlanFull(c,C,pl,{});
+    else { paintPlan(c,C,pl,{}); if(typeof edTables==='function') edTables(c,C); }
+    /* surbrillance de la zone ajoutée */
+    if(base && (pl.W!==base.W || pl.H!==base.H)){
+      const ox = pl.W>base.W && UX.s==='left' ? pl.W-base.W : 0;
+      const oy = pl.H>base.H && UX.s==='top' ? pl.H-base.H : 0;
+      c.strokeStyle='rgba(255,210,60,.95)'; c.lineWidth=1.4;
+      for(let y=0;y<pl.H;y++) for(let x=0;x<pl.W;x++){
+        const bx=x-ox, by=y-oy;
+        const outside = bx<0||by<0||bx>=base.W||by>=base.H;
+        if(outside) c.strokeRect(PAD+x*CELL+1, PAD+y*CELL+1, CELL-2, CELL-2);
+      }
+    }
+  }catch(e){ console.error(e); }
+}
+function xPreview(){
+  const pl=S.plan, side=UX.s, dp=xCurDp(pl), pur=UX.p;
+  const m2=xM2(pl,side,dp), c=xPrice(pl,side,dp,pur), np=xExtend(pl,side,dp);
+  const fl=xFreeLeft();
+  showPopup({icon:'📐', title:'Aperçu · extension sur le plan', wide:true, now:1,
+    body:'<canvas id="xprevcv" width="640" height="420" style="width:100%;max-height:48vh;border-radius:12px;background:#2b1a16"></canvas>'
+      +'<div class="chips" style="margin-top:8px"><span class="chip">Avant '+pl.W+'×'+pl.H+'</span><span class="chip ok">Après '+np.W+'×'+np.H+'</span><span class="chip">+'+m2+' m²</span>'
+      +'<span class="chip">'+(c?fm(c):'🎁 gratuit')+'</span>'+(fl?'<span class="chip">encore '+fl+' m² offerts</span>':'')+'</div>'
+      +'<p class="muted" style="margin:6px 0 0">Zone jaune = surface ajoutée sur la façade <b>'+XSIDE[side]+'</b> · usage <b>'+XPUR[pur].n+'</b>. Une fois les travaux terminés, cette extension est intégrée au plan (aménageable dans l’éditeur).</p>',
+    choices:[{label:'Fermer l’aperçu', cls:'primary', cb(){}}]});
+  setTimeout(()=>{ const cv=document.getElementById('xprevcv'); if(cv) xPaintPrev(cv, np, pl); }, 60);
+}
+
+/* carte Salle : plus de bloc détaché — on pointe vers Travaux */
+xCard = function(){ return ''; };
+
+/* panneau : titre Travaux, construction 10×10 / au-delà, aperçu */
+PANELS.ext = { t:()=>'🏗️ Travaux · Extensions supplémentaires', f(){
+  const pl=S.plan, side=UX.s, pur=UX.p, mode=UX.mode||'sq10';
+  const fl=xFreeLeft(), added=xAdded();
+  if(mode==='sq10' && fl<=0) UX.mode='paid';
+  const dp=xCurDp(pl), m2=xM2(pl,side,dp), c=xPrice(pl,side,dp,pur), ph=xDays(m2,pur), ds=xDates(ph);
+  if(UX.d==null||!ds.some(x=>x[0]===UX.d&&x[2])){ const f=ds.find(x=>x[2]&&closedOn(x[0]))||ds.find(x=>x[2]); UX.d=f?f[0]:ds[0][0]; }
+  const rate=Math.round(xRate(pl,pur,m2));
+  let h='';
+  h+='<div class="card"><h3>✏️ Aménagement du plan</h3><p class="muted" style="margin:0 0 8px">Déplacez murs, tables, cuisine… Les modifications d’aménagement sont des travaux payants (fermeture).</p>'
+    +'<div class="btnrow">'+btn('✏️ Modifier le plan (éditeur)','travedit',null,null,'primary')+'</div></div>';
+
+  h+='<div class="card"><p class="muted">🎁 <b>Carré 10×10 m (100 m²) offert</b> : il reste <b>'+fl+' m² gratuits</b>. Au-delà : '+XPM[pl.pid||0]+' €/m² de base (×'+XPUR[pur].m+' pour '+XPUR[pur].n.toLowerCase()+'), de plus en plus cher avec la surface ajoutée'
+    +(added?' · déjà ajouté <b>+'+added+' m²</b>':'')+' · chantier à ≈ <b>'+rate+' €/m²</b>.</p>'
+    +'<p class="muted" style="margin:0">La façade choisie s’ouvre sur l’extension ; si l’entrée s’y trouve, elle est déplacée sur la nouvelle façade. À la fin des travaux, l’extension est <b>visible et intégrée</b> sur le plan.</p></div>';
+
+  h+='<div class="card"><h3>1 · Usage prévu</h3><div class="btnrow" style="flex-wrap:wrap">'+Object.keys(XPUR).map(k=>btn(XPUR[k].e+' '+XPUR[k].n,'extp',k,null,k===pur?'primary sm':'ghost sm')).join('')+'</div>'
+   +'<h3>2 · Façade</h3><div class="btnrow" style="flex-wrap:wrap">'+Object.keys(XSIDE).map(k=>btn(XSIDE[k],'exts',k,null,k===side?'primary sm':'ghost sm')).join('')+'</div>'
+   +'<h3>3 · Construction</h3><div class="btnrow" style="flex-wrap:wrap">'
+   +btn('🎁 Carré 10×10 · gratuit','extmode','sq10',null,mode==='sq10'?'primary sm':'ghost sm',fl<=0)
+   +btn('💶 Au-delà payant','extmode','paid',null,mode==='paid'?'primary sm':'ghost sm')
+   +'</div>';
+  if(fl<=0) h+='<p class="muted">Quota gratuit épuisé — choisissez « Au-delà payant ».</p>';
+  if(mode==='paid'){
+    h+='<div class="btnrow" style="flex-wrap:wrap;margin-top:6px">'+X_PAID_DPS.map(k=>{
+      const mm=xM2(pl,side,k), pp=xPrice(pl,side,k,pur);
+      return btn(k+' m · +'+mm+' m² · '+(pp?fm(pp):'gratuit'),'extpaid',k,null,(UX.paidDp===k?'primary sm':'ghost sm'));
+    }).join('')+'</div>';
+  } else {
+    h+='<p class="muted" style="margin:8px 0 0">Extension offerte : <b>+'+m2+' m²</b> (équivalent carré 10×10) sur la façade choisie → local <b>'+xDimLabel(pl,side,dp)+'</b>.</p>';
+  }
+  h+='</div>';
+
+  h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+xDimLabel(pl,side,dp)+'<br>Coût : <b>'+(c?fm(c):'0 € · gratuit')+'</b> · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+(pur==='cuisine'?'cuisine fermée, ':'')+'gros travaux : fermeture totale, prime et congés selon la règle des travaux)</p>'
+   +'<label style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Quand ?</span><select class="sl" data-sel="extwhen">'+ds.map(x=>'<option value="'+x[0]+'"'+(x[0]===UX.d?' selected':'')+(x[2]?'':' disabled')+'>'+x[1]+'</option>').join('')+'</select></label>'
+   +(c>S.cash?'<p class="bad">Trésorerie insuffisante : il manque '+fm(c-S.cash)+'. Réduisez la taille ou empruntez (onglet Finances).</p>':'')
+   +'<div class="btnrow" style="flex-wrap:wrap;margin-top:8px">'
+   +btn('👀 Voir le plan avant de lancer','extprev',null,null,'ghost')
+   +btn('Commander l’extension · '+(c?fm(c):'gratuit'),'extgo',null,null,'primary')
+   +'</div></div>';
+
+  const X=XS(); if(X.sched.length) h+='<div class="card"><h3>Programmées</h3>'+X.sched.map(x=>'<p>'+XPUR[x.pur].e+' +'+x.m2+' m² · '+dateShort(x.start)+' → '+dateShort(x.start+x.ph-1)+(x.started?' · en cours':'')+'</p>').join('')+'</div>';
+  if(X.done.length) h+='<div class="card"><h3>Déjà intégrées au plan</h3>'+X.done.map(x=>'<p>'+XPUR[x.pur].e+' +'+x.m2+' m² · jour '+x.day+(x.free?' · offert':'')+'</p>').join('')+'</div>';
+  return h;
+}};
+
+/* commande : utilise xCurDp (plus UX.dp brut) */
+{ const _xo=xOrder; xOrder=function(day){
+    const pl=S.plan; UX.dp=xCurDp(pl);
+    return _xo(day);
+  }; }
+
+Object.assign(ACT,{
+  travopen(){ if(S.trav) return; if(S.pw&&S.pw.j0) return; panelOpen('ext'); },
+  travedit(){ if(S.trav) return; panelClose(); edOpen('trav',planClone(S.plan)); },
+  extmode(k){ if(k==='sq10'&&xFreeLeft()<=0){ toast('Quota 10×10 déjà utilisé — passez en « Au-delà payant ».','warn'); UX.mode='paid'; panelRender(true); return; } UX.mode=k; if(k==='sq10') UX.dp=xSq10Dp(S.plan,UX.s); panelRender(true); },
+  extpaid(k){ UX.mode='paid'; UX.paidDp=+k; UX.dp=+k; panelRender(true); },
+  extprev(){ xPreview(); },
+  extp(k){ UX.p=k; panelRender(true); },
+  exts(k){ UX.s=k; panelRender(true); },
+  extd(k){ /* compat : redirige vers payant */ UX.mode='paid'; UX.paidDp=+k; UX.dp=+k; panelRender(true); },
+  extgo(){ UX.dp=xCurDp(S.plan); const r=xOrder(UX.d); if(r.ok){ note('📐 '+r.msg,'good'); toast(r.msg,'good'); save(); renderTab(true); } else toast(r.msg,'bad'); panelRender(true); },
+  extopen(){ panelOpen('ext'); }
+});
+
+/* message fin de travaux : l’extension est déjà sur le plan */
+{ const _xd=v7ExtDone; v7ExtDone=function(T){ _xd(T); if(T&&T.ext){ try{ note('📐 L’extension est maintenant visible sur le plan de salle. Aménagez-la via Travaux → Modifier le plan.','good'); }catch(e){} } }; }
 
 
 /* ########## w9_tips.js ########## */
