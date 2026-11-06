@@ -250,7 +250,7 @@ const inWin = (w,m) => w.some(x=>m>=x[0]&&m<x[1]);
 const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const DOW_MULT = [0.95,0.95,1.0,1.08,1.18,1.28,1.05];
 const SAVE_KEY = 'bistrot_save_v1';   // même clé que la v1 (migration automatique)
-const SAVE_VER = 9;
+const SAVE_VER = 10;
 const SET_KEY = 'bistrot_settings_v1';
 const G0 = 8.6;                   // groupes / heure au pic (facteur 1)
 const BANKRUPT_CASH = -300, BANKRUPT_DAYS = 3;
@@ -1985,7 +1985,7 @@ function endDay(){
   // péremption
   const heat=S.fx.some(f=>f.k==='heat'); const rate=frigoFactor()*(heat?1.6:1)*((S.breakdown&&S.breakdown.type==='frigo')?2.2:1);
   let lostN=0; lostN+=v7Expire(d);
-  for(const i in ING){ const st=S.stock[i]; if(ING[i].sp>0&&st.q>0){ const lost=Math.min(st.q,Math.floor(st.q*ING[i].sp*rate*0.2+rnd())); if(lost>0){ st.q-=lost; d.loss+=lost*st.cost; lostN+=lost; } } }
+  for(const i in ING){ const st=S.stock[i]; if(ING[i].sp>0&&st.q>0){ const lost=v9Spoil(i,st,rate); if(lost>0){ st.q-=lost; d.loss+=lost*st.cost; lostN+=lost; } } }
   // personnel
   const sick=[];
   for(const s of S.staff.slice()){
@@ -2015,7 +2015,7 @@ function endDay(){
   if(S.hyg<50) tips.push("La propreté est basse : engagez un plongeur ou faites un nettoyage.");
   if(S.cash<0) tips.push('Trésorerie négative ! Faillite après '+BANKRUPT_DAYS+' soirs sous '+BANKRUPT_CASH+' €. Soir '+S.neg+'/'+BANKRUPT_DAYS+'.');
   const best=d.reviews.slice().sort((a,b)=>b.s-a.s)[0], worst=d.reviews.slice().sort((a,b)=>a.s-b.s)[0];
-  S.summary={day:ds,rev:d.rev,cogs:d.cogs,wages:d.wages,fixed:d.fixed,loss:d.loss,other:d.other,interest:d.interest,invest:d.invest,profit,cash:S.cash,
+  S.summary={w9w:!!(typeof worksNow==='function'&&worksNow()),tipsPot:S.day.tips||0,day:ds,rev:d.rev,cogs:d.cogs,wages:d.wages,fixed:d.fixed,loss:d.loss,other:d.other,interest:d.interest,invest:d.invest,profit,cash:S.cash,
     served:d.served,people:d.people,tips:d.tips,inc:d.inc,noshow:d.noshow,swaps:d.swaps,gest:d.gest,walk:d.walk,refused:d.refused,rupt:d.rupt,avg,best,worst,tips,quit:sick,lostN,rep:S.rep,neg:S.neg,
     tempDish:d.tempDish||0,bonus:d.bonus||0,interim:d.interim||0,train:d.train||0,tkRev:d.tkRev||0,repaid:d.repaid||0,repShort:d.repShort||0,womIn:d.womIn||0,womLost:Math.round(d.womLost||0),autoRef:d.autoRef||0,manRef:d.manRef||0,mdj:d.mdj||0,mdjRev:d.mdjRev||0,staffMeal:d.staffMeal||0,smFed:d.smFed||0,smUnfed:d.smUnfed||0,smLeft:d.smLeft||0,mdjLeftNext:S.mdjLeft||0,mdjOut:d.mdjOut||0,later:d.later||0,back:d.back||0,moodRef:d.moodRef||0,staffStock:Math.floor(S.staffStock),loansRem:loansRem(),dow:dowName(ds)};
   S.awaitNext=true;
@@ -2916,7 +2916,7 @@ function confirmBox(title,body,okLabel,cb,cls){ showPopup({icon:'❓',title,body
 /* ---- Bilan ---- */
 function showSummary(s){
   const row=(l,v,c)=>'<div class="srow '+(c||'')+'"><span>'+l+'</span><b>'+v+'</b></div>';
-  let b='<div class="sum">'+row('Recettes','+'+fm(s.rev),'pos')+row('Matières premières','−'+fm(s.cogs))+row('Salaires & charges','−'+fm(s.wages))+row('Énergie & charges','−'+fm(s.fixed))+(s.bonus>0?row('🏗️ Prime travaux (jours de travaux)','−'+fm(s.bonus)):'')+(s.interim>0?row('🧑‍🔧 dont intérim (remplacements)','−'+fm(s.interim)):'')+(s.tkRev>0?row('🥡 dont vente à emporter','+'+fm(s.tkRev),'pos'):'')+
+  let b='<div class="sum">'+row('Recettes','+'+fm(s.rev),'pos')+row('Matières premières','−'+fm(s.cogs))+row('Salaires & charges','−'+fm(s.wages))+row(s.w9w?'Loyer & assurances · eau/élec/gaz 0 € (travaux)':'Énergie & charges (loyer, eau, élec, gaz)','−'+fm(s.fixed))+(s.tipsPot>0?row('💶 Pourboires du jour → cagnotte équipe (hors caisse)',money2(s.tipsPot)):'')+(s.bonus>0?row('🏗️ Prime travaux (jours de travaux)','−'+fm(s.bonus)):'')+(s.interim>0?row('🧑‍🔧 dont intérim (remplacements)','−'+fm(s.interim)):'')+(s.tkRev>0?row('🥡 dont vente à emporter','+'+fm(s.tkRev),'pos'):'')+
     (s.tempDish>0?row('🧽 Plongeur intérimaire (repos du plongeur)','−'+fm(s.tempDish)):'')+row('🍽️ Repas du personnel ('+s.smFed+' repas'+(s.smLeft?', '+s.smLeft+' avec restes du menu du jour':'')+')','−'+fm(s.staffMeal))+(s.smUnfed>0?'<p class="bad">⚠️ Stock personnel insuffisant : '+s.smUnfed+' repas manqués (pas de bonus).</p>':'')+(s.loss>0.5?row('Pertes (périmés)','−'+fm(s.loss)):'')+((s.other+s.interest)>0.5?row('Autres (amendes, pub, intérêts…)','−'+fm(s.other+s.interest)):'')+
     '<div class="srow tot '+(s.profit>=0?'pos':'neg')+'"><span>Résultat du jour</span><b>'+sgn(s.profit)+'</b></div>'+
     (s.invest>0?row('Investissements (hors résultat)','−'+fm(s.invest)):'')+(s.repaid>0?row('🏦 Remboursement de prêt (hors résultat)','−'+fm(s.repaid)):'')+row('Trésorerie','<b>'+fm(s.cash)+'</b>')+'</div>'+
@@ -6373,6 +6373,312 @@ function v8VoisinCard(){ const V=S.voisin||{list:[]}; return card('🏘️ Resta
 /* Accord féminin entretien (concentré → concentrée) — trivial */
 { if(typeof ivA_rush==='function'){ /* w7_ivp already uses § gender marks; fix leftover */ } }
 { const _st=typeof ivStyle==='function'?ivStyle:null; if(_st){ ivStyle=function(p,s,kind){ let t=_st(p,s,kind); if(p&&p.fem){ t=t.replace(/\bconcentré\b/g,'concentrée').replace(/\bmotivé\b/g,'motivée').replace(/\bprêt\b/g,'prête').replace(/\bcontent\b/g,'contente').replace(/\bdébordé\b/g,'débordée').replace(/\bépuisé\b/g,'épuisée'); } return t; }; } }
+
+
+/* ########## w9_core.js ########## */
+/* =====================================================================
+   V9 · NOYAU : migration v9→v10, stocks « zéro perte » 100 % automatiques,
+   travaux (0 eau/élec/gaz, pas d'intérim), Extensions supplémentaires,
+   sonnette de cuisine, glaces 12 parfums
+   ===================================================================== */
+const W9_MUS_DEF={on:true,vol:0.35};
+function v9Defaults(s){
+  if(s.tipPot==null) s.tipPot=0;
+  if(!s.pay9) s.pay9={mk:null,w:{},tipsN:0,hist:[],since:null};
+  if(!s.opt9) s.opt9=Object.assign({},W9_MUS_DEF);
+  s.autoStock=true;
+  if(s.auto) for(const i in s.auto){ if(s.auto[i]) s.auto[i].on=true; }
+}
+MIGRATIONS[9]=function(s){ v9Defaults(s); s.v9news=1; s.mig10=1; };
+{ const _ng=newState; newState=function(){ const s=_ng(); v9Defaults(s); s.tipPot=0; s.pay9={mk:null,w:{},tipsN:0,hist:[],since:null}; return s; }; }
+{ const _rs=restart; restart=function(d0){ _rs(d0); if(S){ v9Defaults(S); S.tipPot=0; S.pay9={mk:null,w:{},tipsN:0,hist:[],since:null}; save(); } }; }
+setTimeout(()=>{ try{ if(S) v9Defaults(S); }catch(e){ console.error(e); } },0);
+setTimeout(()=>{ try{ if(S&&S.trav&&worksNow()&&!S.trav.v8){ v8TravStart(S.trav); save(); } }catch(e){ console.error(e); } try{ if(S&&S.v9news){ S.v9news=0; showPopup({icon:'🆕',title:rName()+' · version 9',body:'Votre partie est <b>conservée</b>.<ul class="tips" style="padding-left:18px"><li>📦 Stocks 100 % automatiques, commandés au plus juste (zéro perte)</li><li>🛍️ Tout ce que vous achetez en Salle apparaît sur le plan</li><li>🚧 Travaux : 0 € d’eau/élec/gaz, pas d’intérim, salaires inchangés</li><li>📐 « Extensions supplémentaires » (100 m² offerts)</li><li>🛎️ Sonnette de cuisine déjà installée</li><li>💶 Pourboires facultatifs → cagnotte partagée à la paie</li><li>🎷 Musique d’ambiance instrumentale (réglages dans ☰ Menu)</li><li>🍨 12 parfums de glace</li></ul>',choices:[{label:'C’est parti',cls:'primary',cb(){}}]}); save(); } }catch(e){} },1100);
+
+/* ---------------- STOCKS : minimum utile, jamais au-delà ---------------- */
+/* jours de couverture visés (commande chaque matin, livraison marché en 2 h) */
+function v9CoverDays(i){ const sp=ING[i].sp, sh=shelfOf(i); if(sp<=0.05&&sh>=60) return 7; if(sp<=0.05) return Math.max(1,Math.min(sh-1,4)); return sh<=2?1:1.3; }
+function v9DayUse(i,d){ const u=useFc(i,d); if(u>0) return u; if(!(carteUse()[i]||mdjCarteSet()[i])) return evtNeed(i,d)||0; if(closedOn(d)) return 0;
+  /* pas encore d'historique : estimation prudente selon la fréquentation prévue */
+  if(useOf(i)==null&&!(S.pw.useN&&S.pw.useN[i]!=null)) return Math.max(3,5*needOf(i))*Math.max(0.3,fcF(d)||0.8); return 0; }
+autoTarget=function(i){ const cap=capOf(i), H=v9CoverDays(i), d0=(S.trav&&worksNow())?S.trav.end+1:dayNum(); let t=0;
+  for(let k=0;k<Math.ceil(H);k++){ const f=Math.min(1,H-k); t+=v9DayUse(i,d0+k)*f; }
+  t*=1.2; /* petite marge de sécurité (ruptures évitées) */
+  if(t<=0) return 0; return Math.min(cap,Math.max(needOf(i)||1,Math.ceil(t))); };
+/* pertes « naturelles » : seulement sur l'excédent au-delà du besoin des 2 prochains jours (stock juste = 0 perte) */
+function v9Spoil(i,st,rate){ const d=(S.trav&&worksNow())?S.trav.end:dayNum(); const need=v9DayUse(i,d+1)+v9DayUse(i,d+2); const ex=Math.max(0,st.q-need); return Math.min(st.q,Math.floor(ex*ING[i].sp*rate*0.2)); }
+/* réassort en cours de journée : seulement le manque du jour, au marché (2 h) */
+function v9FracLeft(m){ if(m<720) return 1; if(m<840) return 0.45+0.55*(840-m)/120; if(m<1140) return 0.45; if(m<1320) return 0.45*(1320-m)/180; return 0; }
+function v9AutoTop(){ const m=minOfDay(); if(S.awaitNext||m<DAYSTART||m>=LASTARR) return; if(worksNow()||closedNow()) return; if(S._v9top&&S.t-S._v9top<30) return; S._v9top=S.t;
+  const d=dayNum(), cart={}; for(const i in ING){ if(!(carteUse()[i]||mdjCarteSet()[i])) continue; if(incoming(i)>0) continue; const st=S.stock[i]; if(!st) continue;
+    const left=v9DayUse(i,d)*v9FracLeft(m); const n=needOf(i)||1; if(st.q>=Math.max(n*2,left*0.8)) continue;
+    const q=Math.ceil(Math.max(n*2,left*1.05-st.q)); if(q>0) cart[i]=Math.min(q,capRoom(i)); }
+  const by={}; for(const i in cart){ if(!(cart[i]>0)) continue; const sid=autoSupplier(i,Object.assign({},S.auto[i]||{},{sup:'marche'})); if(sid) (by[sid]=by[sid]||{})[i]=cart[i]; }
+  for(const sid in by){ const r=placeOrder_v5(sid,by[sid]); if(r.ok) note('🤖 Réassort express ('+SUP[sid].s+') : '+Object.keys(by[sid]).map(i=>ING[i].e+' '+by[sid][i]).join(' · ')+' — juste le nécessaire pour finir la journée.','info'); } }
+autoCheck=function(){ if(S.pw&&!S.pw.j0&&dayNum()>=6) v9AutoTop(); };
+{ const _sh=stockHeader; stockHeader=function(){ let h=_sh(); return h.replace(/Chaque <b>matin<\/b>[^<]*<b>trésorerie − réserve<\/b>[^<]*<b>meilleures ventes<\/b>\./,'Chaque <b>matin</b>, le chef commande <b>au plus juste</b> : la prévision de la journée (affluence, météo, réservations, événements) + une petite marge, <b>jamais au-delà</b> — les produits frais ne dorment pas en réserve, donc <b>zéro perte</b>. Si un produit manque en cours de service, un <b>réassort express</b> du marché couvre seulement la fin de journée. Vous n’avez rien à gérer.'); }; }
+/* stocks toujours automatiques */
+{ const _sm=v6AutoMorning; v6AutoMorning=function(){ S.autoStock=true; if(S.trav&&worksNow()&&dayNum()<S.trav.end) return; return _sm(); }; }
+/* fermeture totale : TOUT le frais qui ne tiendrait pas jusqu'à la réouverture part en repas du personnel (zéro perte) */
+{ const _ts=v8TravStart; v8TravStart=function(T){ _ts(T); try{ let n=0; const reo=T.end+1; for(const i in S.stock){ const st=S.stock[i]; if(!ING[i]||st.q<1) continue; let take=0; try{ for(const l of lotSync(i)) if(l.exp<=reo+1) take+=l.q; }catch(e){} if(ING[i].sp>0.05&&shelfOf(i)<(reo-dayNum())+4) take=st.q; take=Math.floor(Math.min(st.q,take)); if(take>0){ st.q-=take; try{ lotSync(i); }catch(e){} S.staffStock=(S.staffStock||0)+take*0.5; n+=take; } } if(n) note('🥘 Fermeture : '+n+' produits frais transformés en repas du personnel / donnés (aucune perte).','info'); }catch(e){ console.error(e); } }; }
+{ const _su=stockUsageDay; stockUsageDay=function(){ if(S.trav&&worksNow()) return; return _su(); }; }
+
+/* ---------------- TRAVAUX : 0 eau/élec/gaz, pas d'intérim, salaires inchangés ---------------- */
+const v9Total=()=>{ const T=S.trav; return !!(T&&worksNow()); };
+function v9Rent(){ return Math.round(0.2*S.plan.W*S.plan.H); }
+function v9Utilities(){ return Math.round(0.14*S.plan.W*S.plan.H+6*S.tables); }
+fixedCosts=function(){ return v9Total()? v9Rent() : v9Rent()+v9Utilities(); };
+{ const _ai=typeof v6AutoInterim==='function'?v6AutoInterim:null; if(_ai) v6AutoInterim=function(){ if(v9Total()||(S.trav&&dayNum()>=S.trav.start&&dayNum()<=S.trav.end)) return; return _ai(); }; }
+{ const _gc=genCandidates; genCandidates=function(){ if(v9Total()){ S.cand=[]; S.candDay=dayNum(); return; } return _gc(); }; }
+{ const _ws=v6WorksDayStart; v6WorksDayStart=function(){ const r=_ws(); if(v9Total()){ S.tempDish=false; S.staff=S.staff.filter(s=>!s.tmp); } return r; }; }
+{ const _ed=endDay; endDay=function(){ if(v9Total()){ S.tempDish=false; S.staff=S.staff.filter(s=>!s.tmp); } return _ed.apply(this,arguments); }; }
+{ const _tc=v8TravCard; v8TravCard=function(){ const h=_tc(); if(!h) return h; return h.replace('Boîte vocale active (nouvelles résas bloquées).','Boîte vocale active (nouvelles résas bloquées).<br>💧⚡🔥 Eau, électricité, gaz : <b>0 €</b> (compteurs coupés) · 🚫 aucun intérimaire · 💶 salaires de l’équipe inchangés · loyer '+fm(v9Rent())+'/j.'); }; }
+
+/* ---------------- EXTENSIONS SUPPLÉMENTAIRES ---------------- */
+const X_FREE_M2=100; /* base 10×10 m offerte */
+const xFreeLeft=()=>Math.max(0,X_FREE_M2-xAdded());
+xPrice=function(pl,side,dp,pur){ const m2=xM2(pl,side,dp); const paid=Math.max(0,m2-xFreeLeft()); if(paid<=0) return 0; return Math.round(paid*xRate(pl,pur,m2)/10)*10; };
+xCard=function(){ const pl=S.plan, X=XS(), tot=X.done.reduce((a,x)=>a+x.m2,0), fl=xFreeLeft();
+  return card('📐 Extensions supplémentaires · '+pl.W+'×'+pl.H+' m','<p class="muted">Ajoutez des m² (salle, terrasse, cuisine, réserve, toilettes) en choisissant l’<b>usage prévu</b> et la <b>façade</b>, puis aménagez-les dans l’éditeur de plan. <b>Base 10×10 m offerte</b> : '+(fl>0?'encore <b>'+fl+' m² gratuits</b>':'quota gratuit utilisé')+' ; au-delà, payant.'+(tot?' Déjà ajouté : <b>+'+tot+' m²</b>.':'')+(X.sched.length?' 🏗️ '+X.sched.length+' extension(s) programmée(s).':'')+'</p>'+btn('Extensions supplémentaires','extopen',null,null,'primary')); };
+{ const P=PANELS.ext, _f=P.f; P.t=()=>'📐 Extensions supplémentaires'; P.f=function(){ let h=_f.call(this); const fl=xFreeLeft();
+  h=h.replace(/<p class="muted">Prix de base du local[\s\S]*?<\/p>/,'<p class="muted">🎁 <b>Base 10×10 m (100 m²) offerte</b> : il reste <b>'+fl+' m² gratuits</b>. Au-delà : '+XPM[S.plan.pid||0]+' €/m² de base (×'+XPUR[UX.p].m+' pour '+XPUR[UX.p].n.toLowerCase()+'), de plus en plus cher avec la surface ajoutée.</p>');
+  return h.replace(/Agrandir le local/g,'Extensions supplémentaires'); }; }
+
+/* ---------------- SONNETTE DE CUISINE (déjà installée) ---------------- */
+const BELL9={last:0,n:0};
+{ const _tp=taskPri; taskPri=function(t){ const p=_tp(t); return (t.type==='serve'&&t.si===0&&!window.__noBell9)?p-0.6:p; }; }
+{ const _nt=newTask; newTask=function(type,g,stages,o){ if(type==='serve'&&!window.__noBell9&&stages&&stages[0]&&stages[0][0]==='pass'){ stages=stages.map((s,k)=>k===0?[s[0],s[1]*0.5]:[s[0],s[1]*0.92]); }
+  const t=_nt(type,g,stages,o); if(type==='serve'){ t.bell=1; BELL9.n++; S.day.bell=(S.day.bell||0)+1; if(S.t-BELL9.last>3){ BELL9.last=S.t; try{ if(!AU.mute&&AU.ctx&&AU.ctx.state==='running') v9Ding(); }catch(e){} } BELL9.flash=S.t; } return t; }; }
+function v9Ding(){ const c=AU.ctx, t=c.currentTime; for(const [f,dt] of [[1568,0],[2093,0.09]]){ const o=c.createOscillator(), g=c.createGain(); o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0.0001,t+dt); g.gain.exponentialRampToValueAtTime(0.09,t+dt+0.01); g.gain.exponentialRampToValueAtTime(0.0001,t+dt+0.7); o.connect(g); g.connect(c.destination); o.start(t+dt); o.stop(t+dt+0.75); } }
+/* moins de pas perdus : les serveurs ne font plus d'allers-retours à la passe « pour voir » → moins de fatigue */
+{ const _ap=assignAndProgress; assignAndProgress=function(dt){ const r=_ap(dt); try{ if(!window.__noBell9) for(const s of S.staff){ if(s.role==='waiter'&&avail(s)&&s.fat>0) s.fat=Math.max(0,s.fat-0.012*dt); } }catch(e){} return r; }; }
+
+/* ---------------- GLACES : 12 parfums (7 classiques + 5 originaux) ---------------- */
+const GLACE9=[
+  {n:'Vanille de Madagascar',k:'c',w:1.6},{n:'Chocolat noir',k:'c',w:1.5},{n:'Fraise',k:'c',w:1.3},{n:'Pistache',k:'c',w:1.1},
+  {n:'Caramel beurre salé',k:'c',w:1.3},{n:'Café',k:'c',w:0.8},{n:'Citron',k:'c',w:0.9},
+  {n:'Lavande & miel de Provence',k:'o',w:0.45},{n:'Yuzu-gingembre',k:'o',w:0.4},{n:'Basilic-citron vert',k:'o',w:0.35},{n:'Thé matcha',k:'o',w:0.4},{n:'Fraise-poivre de Timut',k:'o',w:0.3}];
+try{ GLACE_PARF.length=0; GLACE9.forEach(p=>GLACE_PARF.push(p.n)); }catch(e){}
+DISH.g1&&(DISH.g1.n='Glace 1 boule (parfum au choix)'); DISH.g2&&(DISH.g2.n='Glace 2 boules (parfums au choix)'); DISH.g3&&(DISH.g3.n='Glace 3 boules (parfums au choix)');
+function v9PickParf(n){ const out=[]; for(let k=0;k<n;k++){ const pool=GLACE9.filter(p=>!out.includes(p.n)); const tot=pool.reduce((a,p)=>a+p.w,0); let r=rnd()*tot; let ch=pool[0]; for(const p of pool){ r-=p.w; if(r<=0){ ch=p; break; } } out.push(ch.n); } return out; }
+{ const _td=takeDish; takeDish=function(id,o){ const it=_td(id,o); const d=DISH[id]; if(d&&d.ice){ it.parf=v9PickParf(d.boules||1); it.chant=rnd()<0.28; S.day.ice=S.day.ice||{}; for(const p of it.parf) S.day.ice[p]=(S.day.ice[p]||0)+1; S.pay9=S.pay9||{}; S.iceTot=S.iceTot||{}; for(const p of it.parf) S.iceTot[p]=(S.iceTot[p]||0)+1; } return it; }; }
+const iceLab=it=>'🍨 '+(it.parf||[]).join(' + ')+(it.chant?' + chantilly':'');
+{ const _dn=dishNames; dishNames=function(g){ let t=_dn(g); const ic=(g.items||[]).filter(i=>i.parf&&!i.gift); if(ic.length) t+=' <small>('+ic.map(iceLab).join(' · ')+')</small>'; return t; }; }
+function v9GlaceCard(){ const tot=S.iceTot||{}; const row=p=>'<span class="chip'+(p.k==='o'?' warn':'')+'">'+(p.k==='o'?'✨ ':'')+p.n+(tot[p.n]?' · '+tot[p.n]:'')+'</span>';
+  return card('🍨 Glaces artisanales · 12 parfums','<p class="muted" style="margin:0 0 4px">Le client choisit <b>1 boule (2 €)</b>, <b>2 boules (4 €)</b> ou <b>3 boules (6 €)</b>, puis ses parfums ; <b>chantilly</b> sur demande à la prise de commande. Les parfums choisis s’affichent sur la commande de la table.</p><b>Classiques</b><div class="chips">'+GLACE9.filter(p=>p.k==='c').map(row).join('')+'</div><b>Originaux</b><div class="chips">'+GLACE9.filter(p=>p.k==='o').map(row).join('')+'</div>'); }
+{ const _vm=VIEWS.menu; VIEWS.menu=function(){ let h=_vm(); try{ h+=v9GlaceCard(); }catch(e){ console.error(e); } return h; }; }
+/* correctif v8 : addXp(null) (tâche faite par le patron) plantait le service */
+{ const _ax9=addXp; addXp=function(s,n){ if(!s){ try{ return _ax9(s,n); }catch(e){ return; } } return _ax9(s,n); }; }
+/* correctif v8 : la formation « travaux » durait jusqu'au matin de la réouverture → l'équipe semblait absente et
+   l'intérim était appelé pour tout le monde. On clôt la formation dès le début de la journée de réouverture. */
+{ const _ds=v6DayStart; v6DayStart=function(){ try{ const t0=(dayNum()-1)*1440+DAYSTART; let n=0; for(const s of S.staff){ if(s.trn&&s.trn.v8&&s.trn.until<=t0+1){ const cap=(S.mich&&S.mich.star)?20:10; s.skill=clamp(s.skill+1,1,cap); s.trn=null; n++; } } if(n){ if(S.vm) S.vm.on=0; note('🎉 Réouverture ! '+n+' employé(s) ont progressé pendant les travaux (+1 niveau).','good'); } }catch(e){ console.error(e); } return _ds(); }; }
+
+
+/* ########## w9_tips.js ########## */
+/* =====================================================================
+   V9 · POURBOIRES FACULTATIFS → CAGNOTTE, partagée à la paie (bulletin de fin de mois)
+   ===================================================================== */
+{ const _j=judge; judge=function(g){ const r=_j(g); try{ if(g) g._j9=r; }catch(e){} return r; }; }
+/* modèle réaliste : en France le pourboire n'est pas obligatoire ; souvent on « laisse la monnaie » */
+function v9Tip(g,rev,stars,byPlayer){ if(!(rev>0)||g.preo) return 0;
+  const tm={presse:0.7,habitue:1.25,famille:0.9,exigeant:0.8,tourist:1.15,critic:0.6}[g.type]||1;
+  const p=clamp((0.10+0.22*(stars-3))*tm*(byPlayer?1.1:1),0.02,0.85); if(rnd()>p) return 0;
+  let pct=0.03+0.045*clamp(stars-3.5,0,1.5)+rnd()*0.03; let t=rev*pct*(g.type==='habitue'?1.2:1);
+  /* cas extrêmes : grande tablée ravie, client généreux (très rare) */
+  if(stars>=4.7&&rnd()<0.004+0.00002*rev){ t=Math.max(t,rint(60,Math.min(400,Math.max(80,rev*0.5)))); }
+  /* souvent : on laisse simplement la monnaie (0,50 € – 2 €) */
+  if(stars<4.3&&rnd()<0.45) t=pick([0.5,0.5,1,1,1.5,2]);
+  t=Math.max(0.5,t); t=t<5?Math.round(t*2)/2:Math.round(t); return Math.min(400,t); }
+{ const _pay=pay; pay=function(g,byPlayer,wid){ const tips0=S.day.tips||0, h=Math.floor(minOfDay()/60)%24; _pay(g,byPlayer,wid);
+  const t0=(S.day.tips||0)-tips0; if(t0>0){ S.cash-=t0; S.day.rev-=t0; try{ S.day.revH[h]-=t0; }catch(e){} S.day.tips=tips0; }
+  const st=(g._j9&&g._j9.stars)||3; const sub=(g.items||[]).reduce((a,i)=>a+(i.price||0),0)*(1-(g.disc||0));
+  const tip=v9Tip(g,sub,st,byPlayer); if(tip>0){ S.tipPot=Math.round(((S.tipPot||0)+tip)*100)/100; S.day.tips=(S.day.tips||0)+tip; S.day.tipsN=(S.day.tipsN||0)+1; S.pay9.tipsN=(S.pay9.tipsN||0)+1; if(tip>=50) note('💶 Pourboire exceptionnel : '+money2(tip)+' laissé par '+(g.name||'une table')+' ! (cagnotte de l’équipe)','good'); } }; }
+{ const _ac=A_cash; A_cash=function(gid){ const r=_ac(gid); if(r&&r.ok) r.msg='💶 Addition encaissée (pourboire éventuel → cagnotte de l’équipe).'; return r; }; }
+/* employés « fixes » : CDI, CDD/saisonniers, apprentis… (absents compris) — ni intérim, ni patron */
+const v9Fixed=()=>S.staff.filter(s=>!s.tmp&&!(s.ct&&s.ct.k==='interim'));
+const v9WageToday=(s,d)=>d<6?0:((absentDay(s,d)&&!onLeave(s,d))?0:s.wage);
+function v9PayAcc(d){ const P=S.pay9; const mk=monthKey(d); if(P.mk!==mk){ P.mk=mk; P.w={}; P.tipsN=P.tipsN||0; P.since=d; }
+  for(const s of S.staff){ if(s.tmp) continue; const w=v9WageToday(s,d); const e=P.w[s.id]=P.w[s.id]||{name:s.name,role:s.role,ct:(s.ct&&s.ct.k)||'cdi',days:0,wage:0}; e.name=s.name; e.days+=w>0?1:0; e.wage+=w; } }
+function v9Payslip(d){ const P=S.pay9, staff=v9Fixed(), n=staff.length, pot=Math.round((S.tipPot||0)*100)/100;
+  const share=n?Math.floor(pot/n*100)/100:0; const rows=staff.map(s=>{ const e=P.w[s.id]||{days:0,wage:0}; return {id:s.id,name:s.name,role:s.role,ct:(s.ct&&s.ct.k)||'cdi',days:e.days,wage:Math.round(e.wage*100)/100,tip:share,tot:Math.round((e.wage+share)*100)/100,abs:absentDay(s,d)}; });
+  const rest=Math.round((pot-share*n)*100)/100;
+  const slip={mk:monthKey(d),day:d,pot,n,share,rest,tipsN:P.tipsN||0,rows,since:P.since};
+  P.hist=P.hist||[]; P.hist.unshift(slip); if(P.hist.length>12) P.hist.pop();
+  S.tipPot=rest; P.tipsN=0; P.w={}; P.mk=null; return slip; }
+const KN9={cdi:'CDI',cdd:'CDD',saison:'Saisonnier',appr:'Apprenti',interim:'Intérim'};
+function v9SlipHtml(sl){ return '<p class="muted" style="margin:0 0 6px">'+mkLabel(sl.mk)+(sl.since&&ymd(sl.since).dd>1?' <small>(suivi depuis le '+dateShort(sl.since)+')</small>':'')+' · cagnotte pourboires <b>'+money2(sl.pot)+'</b> ('+sl.tipsN+' pourboire'+(sl.tipsN>1?'s':'')+') ÷ <b>'+sl.n+'</b> salarié'+(sl.n>1?'s':'')+' fixes = <b>'+money2(sl.share)+'</b> chacun'+(sl.rest>0?' · reliquat '+money2(sl.rest)+' reporté':'')+'.<br><small>Intérimaires et patron exclus · absents inclus · salaires journaliers déjà versés chaque jour.</small></p>'
+  +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px"><tr style="text-align:left;border-bottom:2px solid var(--line)"><th>Salarié</th><th>Contrat</th><th style="text-align:right">Jours</th><th style="text-align:right">Salaire du mois</th><th style="text-align:right">Pourboires</th><th style="text-align:right">Total</th></tr>'
+  +sl.rows.map(r=>'<tr style="border-bottom:1px solid var(--line)"><td>'+((ROLE[r.role]||{}).e||'')+' '+r.name+(r.abs?' <small>(absent)</small>':'')+'</td><td>'+(KN9[r.ct]||r.ct)+'</td><td style="text-align:right">'+r.days+'</td><td style="text-align:right">'+money2(r.wage)+'</td><td style="text-align:right">'+money2(r.tip)+'</td><td style="text-align:right"><b>'+money2(r.tot)+'</b></td></tr>').join('')
+  +'<tr><td colspan="3"><b>Total</b></td><td style="text-align:right"><b>'+money2(sl.rows.reduce((a,r)=>a+r.wage,0))+'</b></td><td style="text-align:right"><b>'+money2(sl.share*sl.n)+'</b></td><td style="text-align:right"><b>'+money2(sl.rows.reduce((a,r)=>a+r.tot,0))+'</b></td></tr></table></div>'; }
+{ const _ve=v6EndDay; v6EndDay=function(ds){ const d=dayNum(); try{ v9PayAcc(d); if(lastDayOfMonth(d)&&d>=6&&v9Fixed().length){ const sl=v9Payslip(d); note('🧾 Bulletins de paie de '+mkLabel(sl.mk)+' : pourboires '+money2(sl.pot)+' → '+money2(sl.share)+' par salarié fixe.','good'); showPopup({icon:'🧾',title:'Bulletin de paie · '+mkLabel(sl.mk),wide:true,body:v9SlipHtml(sl),choices:[{label:'OK',cls:'primary',cb(){}}]}); } }catch(e){ console.error(e); } return _ve(ds); }; }
+function v9TipCard(){ const P=S.pay9||{}; const n=v9Fixed().length, pot=S.tipPot||0, d=dayNum(); const last=(P.hist||[])[0];
+  const end=daysInMonthOf(d)-ymd(d).dd; return card('💶 Cagnotte des pourboires','<p>Ce mois-ci : <b>'+money2(pot)+'</b> ('+(P.tipsN||0)+' pourboire'+((P.tipsN||0)>1?'s':'')+') · '+n+' salarié'+(n>1?'s':'')+' fixes → ≈ <b>'+money2(n?pot/n:0)+'</b> chacun.</p><p class="muted">Pourboires facultatifs (dès 0,50 €, davantage si le client est ravi). Partagés à parts égales entre les salariés fixes (absents compris, hors intérim et patron) avec la paie du '+(end<=0?'<b>ce soir</b>':'dernier jour du mois (dans '+end+' j)')+'.</p>'+(last?btn('🧾 Dernier bulletin ('+mkLabel(last.mk)+')','slip9',null,null,'ghost sm'):'')); }
+Object.assign(ACT,{ slip9(){ const sl=(S.pay9.hist||[])[0]; if(sl) showPopup({icon:'🧾',title:'Bulletin de paie · '+mkLabel(sl.mk),wide:true,body:v9SlipHtml(sl),choices:[{label:'Fermer',cls:'primary',cb(){}}],now:1}); } });
+
+
+/* ########## w9_music.js ########## */
+/* =====================================================================
+   V9 · MUSIQUE D'AMBIANCE : playlist instrumentale « lounge / ascenseur »
+   100 % générée en Web Audio (compositions originales, sans paroles, libres de droits)
+   ===================================================================== */
+DECOR.musique.d='Playlist instrumentale lounge-jazz, sans paroles, en sourdine (réglages : ☰ Menu).';
+try{ if(UPGS.d_musique) UPGS.d_musique.d=DECOR.musique.d+' · ambiance +'+DECOR.musique.a; }catch(e){}
+const MUS_TRACKS=[
+  {n:'Ascenseur pour le zinc',bpm:92,key:53,prog:[['M',0],['m',9],['m',2],['d',7]],sw:0.58},
+  {n:'Lounge Montmartre',bpm:80,key:48,prog:[['M',0],['m',9],['m',2],['d',7]],sw:0.62},
+  {n:'Petit matin au marché',bpm:100,key:55,prog:[['M',0],['m',4],['m',9],['d',2]],sw:0.55},
+  {n:'Velours de minuit',bpm:70,key:51,prog:[['m',0],['m',5],['d',7],['M',3]],sw:0.6},
+  {n:'Terrasse en septembre',bpm:88,key:50,prog:[['M',0],['M',5],['m',4],['d',9]],sw:0.57}];
+const CH9={M:[0,4,7,11],m:[0,3,7,10],d:[0,4,7,10]};
+const MU={on:false,gain:null,flt:null,timer:null,tr:0,bar:0,beat:0,next:0,noise:null,lastMel:null,started:0};
+const mf=n=>440*Math.pow(2,(n-69)/12);
+const musOpt=()=>(S&&S.opt9)||W9_MUS_DEF;
+const musOwned=()=>!!(S&&S.decor&&S.decor.musique);
+/* la musique « tourne » dans le restaurant (effets de jeu) si installée + activée + établissement ouvert */
+function musActive(){ if(!S||!musOwned()||!musOpt().on) return false; if(S.awaitNext||worksNow()||closedNow()) return false; const ph=phaseOf(minOfDay()); return ph.k!=='closed'; }
+function musNode(){ const c=AU.ctx; if(!c) return null; if(!MU.gain){ MU.gain=c.createGain(); MU.gain.gain.value=0; MU.flt=c.createBiquadFilter(); MU.flt.type='lowpass'; MU.flt.frequency.value=3200; MU.gain.connect(MU.flt); MU.flt.connect(c.destination);
+    const n=Math.floor(c.sampleRate*0.25), b=c.createBuffer(1,n,c.sampleRate), d=b.getChannelData(0); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1); MU.noise=b; } return MU.gain; }
+function mNote(t,f,dur,vol,type,trem){ const c=AU.ctx; const o=c.createOscillator(), g=c.createGain(); o.type=type||'sine'; o.frequency.setValueAtTime(f,t);
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.015); g.gain.exponentialRampToValueAtTime(Math.max(0.0001,vol*0.35),t+dur*0.4); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  if(trem){ const l=c.createOscillator(), lg=c.createGain(); l.frequency.value=5.2; lg.gain.value=vol*0.25; l.connect(lg); lg.connect(g.gain); l.start(t); l.stop(t+dur); }
+  o.connect(g); g.connect(MU.gain); o.start(t); o.stop(t+dur+0.05); }
+function mBrush(t,vol){ const c=AU.ctx; const s=c.createBufferSource(); s.buffer=MU.noise; const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=6500; const g=c.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.12); s.connect(f); f.connect(g); g.connect(MU.gain); s.start(t); s.stop(t+0.15); }
+function mSched(){ const c=AU.ctx; if(!c||!MU.on) return; const T=MUS_TRACKS[MU.tr%MUS_TRACKS.length], q=60/T.bpm/2; /* croche */
+  while(MU.next<c.currentTime+0.35){ const t=MU.next, step=MU.beat%8, ch=T.prog[MU.bar%T.prog.length], root=T.key+ch[1], iv=CH9[ch[0]];
+    const swing=(step%2===1)?q*(T.sw-0.5)*2:0; const tt=t+swing;
+    /* piano électrique : accord au 1er temps et sur le « et » du 2 (comping bossa) */
+    if(step===0||step===3||(step===6&&MU.bar%2)) for(const k of iv) mNote(tt,mf(root+12+k),q*(step===0?5:2.5),0.028,'triangle');
+    /* contrebasse : fondamentale / quinte */
+    if(step===0) mNote(tt,mf(root-12),q*3.6,0.07,'sine'); if(step===4) mNote(tt,mf(root-12+7),q*3.2,0.06,'sine'); if(step===7&&rnd()<0.5) mNote(tt,mf(root-12+(rnd()<0.5?5:-1)),q*0.9,0.04,'sine');
+    /* balais */
+    mBrush(tt,step%2?0.012:0.02);
+    /* vibraphone : mélodie douce sur les notes de l'accord + pentatonique */
+    if(rnd()<(step%2?0.28:0.5)){ const sc=iv.concat([2,9]); let n=T.key+24+ch[1]+pick(sc); if(MU.lastMel!=null&&Math.abs(n-MU.lastMel)>7) n+=n>MU.lastMel?-12:12; MU.lastMel=n; mNote(tt,mf(n),q*(rnd()<0.3?3:1.6),0.035,'sine',true); }
+    MU.next+=q; MU.beat++; if(MU.beat%8===0){ MU.bar++; if(MU.bar>=16){ MU.bar=0; MU.tr=(MU.tr+1)%MUS_TRACKS.length; try{ if(H.interactive!==false) toast('🎷 Musique : « '+MUS_TRACKS[MU.tr].n+' »','info'); }catch(e){} } } } }
+function musStart(){ const c=AU.ctx; if(!c||MU.on) return; musNode(); MU.on=true; MU.next=c.currentTime+0.1; MU.beat=0; MU.started=Date.now(); MU.gain.gain.cancelScheduledValues(c.currentTime); MU.gain.gain.setTargetAtTime(musOpt().vol*0.9,c.currentTime,0.8); MU.timer=setInterval(mSched,90); }
+function musStop(){ const c=AU.ctx; if(!MU.on) return; MU.on=false; clearInterval(MU.timer); MU.timer=null; if(c&&MU.gain) MU.gain.gain.setTargetAtTime(0,c.currentTime,0.3); }
+function musTick(){ try{ const want=musActive()&&!AU.mute&&AU.ctx&&AU.ctx.state==='running'&&!document.hidden; if(want&&!MU.on) musStart(); else if(!want&&MU.on) musStop(); if(MU.on&&MU.gain) MU.gain.gain.setTargetAtTime(musOpt().vol*0.9,AU.ctx.currentTime,0.2); }catch(e){} }
+setInterval(musTick,1000);
+/* effets de jeu : ambiance + avis (volume trop fort = critiques) */
+{ const _am=ambiance; ambiance=function(){ let a=_am(); if(musOwned()&&!musOpt().on) a-=DECOR.musique.a; return clamp(a,0,AMB_MAX); }; }
+{ const _j=judge; judge=function(g){ const r=_j(g); try{ if(musActive()){ const v=musOpt().vol; r.stars=clamp(r.stars+(v>0.8?-0.08:v>=0.1?0.07:0),1,5); r.mus=v>0.8?-1:1; } }catch(e){} return r; }; }
+{ const _rt=reviewText; reviewText=function(stars,g,parts){ let t=_rt(stars,g,parts); try{ if(musActive()){ const v=musOpt().vol; if(v>0.8&&rnd()<0.35) t+=' La musique était bien trop forte.'; else if(stars>=4&&rnd()<0.18) t+=' '+pick(['Petite musique jazzy en fond, très agréable.','Ambiance feutrée, musique lounge discrète : parfait.','On s’entend parler, et la musique d’ambiance est top.']); } }catch(e){} return t; }; }
+document.addEventListener('input',e=>{ const el=e.target; if(el&&el.id==='musvol9'&&S){ S.opt9=S.opt9||Object.assign({},W9_MUS_DEF); S.opt9.vol=clamp(+el.value/100,0,1); const o=document.getElementById('musvol9l'); if(o) o.textContent=Math.round(S.opt9.vol*100)+' %'+(S.opt9.vol>0.8?' (trop fort pour les clients !)':''); save(); musTick(); } });
+function musSettingsHtml(){ const o=musOpt(); if(!musOwned()) return '<p class="muted" style="margin:8px 0 0">🎷 Musique d’ambiance : à installer dans Salle → Améliorations (« Musique d’ambiance »).</p>';
+  return '<div style="margin:10px 0 0;padding:8px;border:2px solid var(--line);border-radius:10px"><b>🎷 Musique d’ambiance</b> '+(o.on?'<span class="chip ok">activée</span>':'<span class="chip">coupée</span>')+'<br><small class="muted">Playlist instrumentale lounge-jazz sans paroles ('+MUS_TRACKS.map(t=>t.n).join(' · ')+'). Se joue pendant les heures d’ouverture. Volume conseillé : 20–60 %.</small><label style="display:flex;gap:8px;align-items:center;margin-top:6px"><span>Volume</span><input id="musvol9" type="range" min="0" max="100" value="'+Math.round(o.vol*100)+'" style="flex:1"><b id="musvol9l">'+Math.round(o.vol*100)+' %</b></label></div>'; }
+showMenuSheet=function(){
+  showPopup({icon:'☰',title:'Menu · '+rName(),body:'<p class="muted">'+rName()+' — simulation de gestion. Sauvegarde automatique sur cet appareil. Les stocks sont commandés automatiquement, au plus juste.</p><label style="display:flex;gap:8px;align-items:center;margin:10px 0"><span>Nom du restaurant</span><input id="rnamein" class="ti" style="flex:1;height:40px;border:2px solid var(--line);border-radius:10px;padding:0 8px" value="'+rName().replace(/"/g,'&quot;')+'"></label>'+musSettingsHtml(),
+    choices:[{label:'💾 Enregistrer le nom',cls:'primary',cb(){ const v=(document.getElementById('rnamein')||{}).value; if(v&&v.trim()){ S.rName=v.trim().slice(0,40); applyRName(); save(); toast('Nom enregistré : '+S.rName,'good'); } }}]
+      .concat(musOwned()?[{label:musOpt().on?'🎷 Couper la musique d’ambiance':'🎷 Activer la musique d’ambiance',cls:'ghost',cb(){ S.opt9=S.opt9||Object.assign({},W9_MUS_DEF); S.opt9.on=!S.opt9.on; save(); audioUnlock(); musTick(); toast(S.opt9.on?'🎷 Musique d’ambiance activée.':'Musique d’ambiance coupée.','info'); }}]:[])
+      .concat([{label:'❓ Aide / tutoriel',cls:'ghost',cb(){ showTuto(0); }},
+             {label:AU.mute?'🔊 Activer le son':'🔇 Couper le son',cls:'ghost',cb(){ setMute(!AU.mute); updateHeader(); }},
+             {label:'🔄 Nouvelle partie',cls:'danger',cb(){ newGameFlow(false); }},
+             {label:'Fermer',cls:'ghost',cb(){}}])}); };
+
+
+/* ########## w9_decor.js ########## */
+/* =====================================================================
+   V9 · TOUT ACHAT DE SALLE VISIBLE SUR LE PLAN (décor, mobilier, éclairage,
+   bar, terrasse, toilettes, cuisine, réserve) + sonnette de cuisine
+   ===================================================================== */
+const has9=id=>{ try{ return upgOn(id); }catch(e){ return false; } };
+const dec9=k=>!!(S&&S.decor&&S.decor[k]);
+function v9DecorSig(){ if(!S) return ''; const u=(S.upg&&S.upg.on)||{}; return Object.keys(S.decor||{}).filter(k=>S.decor[k]).join(',')+'|'+Object.keys(u).filter(k=>u[k]).sort().join(',')+'|'+(S.mich&&S.mich.star?1:0); }
+{ const _bk=bgKeyNow; bgKeyNow=function(){ return _bk()+'|'+v9DecorSig(); }; }
+function v9Walls(C,pl){ const W=C.W,H=C.H,out=[]; for(let y=0;y<H;y++) for(let x=0;x<W;x++){ if(pl.g[y][x]!=='W') continue;
+    for(const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]){ const a=x+dx,b=y+dy; if(a<0||b<0||a>=W||b>=H) continue; const v=b*W+a; const ch=pl.g[b][a];
+      if((C.comp[v]===C.hall&&C.hall>=0&&(ch==='.'))||(C.occ[v]&&!(C.kit&&C.kit.has(C.comp[v])))){ out.push({x,y,dx,dy,border:(x===0||y===0||x===W-1||y===H-1)}); break; } } }
+  return out; }
+const spread9=(L,n,off)=>{ const o=[]; if(!L.length) return o; for(let k=0;k<n;k++){ const i=Math.floor(((k+(off||0.5))/n)*L.length)%L.length; if(!o.includes(L[i])) o.push(L[i]); } return o; };
+/* position sur le bord intérieur du mur (côté salle) */
+function wEdge(w){ const X=PAD+w.x*CELL, Y=PAD+w.y*CELL; return {x:X+CELL/2+w.dx*CELL*0.5,y:Y+CELL/2+w.dy*CELL*0.5,h:w.dx!==0}; }
+function v9HallFloor(C,pl){ const W=C.W,out=[]; for(const v of (C.hallCells||[])){ const x=v%W,y=(v/W)|0; let nw=0; for(const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]) if(pget(pl,x+dx,y+dy)==='W') nw++; if(nw>=2) out.push({x,y}); } return out; }
+function plant9(c,x,y,s){ s=s||1; c.fillStyle='rgba(30,15,5,.25)'; c.beginPath(); c.ellipse(x+1,y+2,4*s,2.2*s,0,0,6.3); c.fill(); c.fillStyle='#a0522d'; c.beginPath(); c.arc(x,y,3.2*s,0,6.3); c.fill(); c.fillStyle='#3f8a46'; for(let a=0;a<6;a++){ c.beginPath(); c.arc(x+Math.cos(a*1.05)*2.6*s,y+Math.sin(a*1.05)*2.6*s-0.6,2.3*s,0,6.3); c.fill(); } c.fillStyle='#5fb35f'; c.beginPath(); c.arc(x-.6,y-1,1.6*s,0,6.3); c.fill(); }
+function v9Decor(c,C,pl){ if(!S||!C||!pl) return; try{
+  const walls=v9Walls(C,pl).sort((a,b)=>a.y-b.y||a.x-b.x); const inner=walls.filter(w=>!(w.border&&((w.x+w.y)%3===1)));
+  const E=C.E; const nearE=E?walls.slice().sort((a,b)=>Math.hypot(a.x-E.x,a.y-E.y)-Math.hypot(b.x-E.x,b.y-E.y)):[];
+  // peinture & boiseries : soubassement crème le long des murs de salle
+  if(has9('peinture')){ for(const w of walls){ const X=PAD+w.x*CELL, Y=PAD+w.y*CELL; c.fillStyle='rgba(236,214,170,.85)'; if(w.dy) c.fillRect(X,w.dy>0?Y+CELL-3.2:Y,CELL,3.2); else c.fillRect(w.dx>0?X+CELL-3.2:X,Y,3.2,CELL); c.fillStyle='rgba(120,80,40,.6)'; if(w.dy) c.fillRect(X,w.dy>0?Y+CELL-3.4:Y+3.2,CELL,.5); else c.fillRect(w.dx>0?X+CELL-3.4:X+3.2,Y,.5,CELL); } }
+  // panneaux acoustiques
+  if(has9('acoust')) for(const w of spread9(inner,6,0.2)){ const p=wEdge(w); c.fillStyle='#4e5d6c'; if(p.h) rr(c,p.x-1.6,p.y-5,3.2,10,1); else rr(c,p.x-5,p.y-1.6,10,3.2,1); c.fill(); c.fillStyle='rgba(255,255,255,.25)'; if(p.h) c.fillRect(p.x-.3,p.y-4,.6,8); else c.fillRect(p.x-4,p.y-.3,8,.6); }
+  // affiches & miroirs Belle Époque
+  if(dec9('affiches')) spread9(inner,5,0.6).forEach((w,i)=>{ const p=wEdge(w); const col=['#7a1f2e','#2f5f7a','#4b7a3a','#a8742f','#5b3b7a'][i%5]; c.fillStyle='#caa24a'; if(p.h) c.fillRect(p.x-2,p.y-5.5,4,11); else c.fillRect(p.x-5.5,p.y-2,11,4); c.fillStyle=i%2?'#cfe6ef':col; if(p.h) c.fillRect(p.x-1.2,p.y-4.6,2.4,9.2); else c.fillRect(p.x-4.6,p.y-1.2,9.2,2.4); });
+  // luminaires sur mesure (appliques dorées)
+  if(has9('rideaux2')) for(const w of spread9(inner,7,0.05)){ const p=wEdge(w); const g=c.createRadialGradient(p.x,p.y,0,p.x,p.y,9); g.addColorStop(0,'rgba(255,220,140,.55)'); g.addColorStop(1,'rgba(255,220,140,0)'); c.fillStyle=g; c.beginPath(); c.arc(p.x,p.y,9,0,6.3); c.fill(); c.fillStyle='#d9b85a'; c.beginPath(); c.arc(p.x,p.y,1.8,0,6.3); c.fill(); c.fillStyle='#fff3c8'; c.beginPath(); c.arc(p.x,p.y,1,0,6.3); c.fill(); }
+  // rideaux ouverts (gratuit) : drapés rouges aux fenêtres
+  if(has9('rideaux')) for(const w of walls.filter(w=>w.border&&((w.x+w.y)%3===1))){ const X=PAD+w.x*CELL, Y=PAD+w.y*CELL; c.fillStyle='#9d2a35'; if(w.dy){ c.fillRect(X,Y+(w.dy>0?CELL-3:0),3,3); c.fillRect(X+CELL-3,Y+(w.dy>0?CELL-3:0),3,3); } else { c.fillRect(X+(w.dx>0?CELL-3:0),Y,3,3); c.fillRect(X+(w.dx>0?CELL-3:0),Y+CELL-3,3,3); } }
+  // climatisation
+  if(has9('clim')){ const w=spread9(inner,1,0.35)[0]; if(w){ const p=wEdge(w); c.fillStyle='#f2f4f5'; if(p.h) rr(c,p.x-2.4,p.y-7,4.8,14,1.5); else rr(c,p.x-7,p.y-2.4,14,4.8,1.5); c.fill(); c.strokeStyle='#9aa5ad'; c.lineWidth=.5; c.stroke(); c.fillStyle='#7fd0ff'; c.fillRect(p.x-.6,p.y-.6,1.2,1.2); } }
+  // ardoise du menu près de l'entrée
+  if(has9('ardoise')){ const w=nearE.find(w=>!(w.x===E.x&&w.y===E.y)); if(w){ const p=wEdge(w); c.fillStyle='#8a5a32'; rr(c,p.x-6,p.y-4.5,12,9,1); c.fill(); c.fillStyle='#2b2f2e'; rr(c,p.x-5,p.y-3.5,10,7,.8); c.fill(); c.fillStyle='rgba(255,255,255,.8)'; for(let k=0;k<3;k++) c.fillRect(p.x-3.6,p.y-2+k*2,5+(k%2)*2,.5); } }
+  // enceintes (musique d'ambiance)
+  if(dec9('musique')) spread9(walls,2,0.15).forEach(w=>{ const p=wEdge(w); c.fillStyle='#1d1d22'; rr(c,p.x-3.2,p.y-3.2,6.4,6.4,1.2); c.fill(); c.fillStyle='#555'; c.beginPath(); c.arc(p.x,p.y,2,0,6.3); c.fill(); c.fillStyle='#999'; c.beginPath(); c.arc(p.x,p.y,.7,0,6.3); c.fill(); });
+  // plantes & fleurs dans les coins de salle
+  if(dec9('plantes')){ const F=v9HallFloor(C,pl); for(const f of spread9(F,4,0.3)){ const X=PAD+f.x*CELL, Y=PAD+f.y*CELL; plant9(c,X+CELL/2,Y+CELL/2,1); } }
+  // comptoir en zinc + machine à café + tireuse sur le bar
+  const B=(C.L&&C.L.B)||[];
+  if(dec9('zinc')) for(const b of B){ const X=PAD+b.x*CELL, Y=PAD+b.y*CELL; const g=c.createLinearGradient(X,Y,X+CELL,Y+CELL); g.addColorStop(0,'rgba(230,236,240,.85)'); g.addColorStop(.5,'rgba(170,180,188,.85)'); g.addColorStop(1,'rgba(220,226,230,.85)'); c.fillStyle=g; c.fillRect(X+1,Y+1,CELL-2,CELL-2); c.fillStyle='rgba(255,255,255,.7)'; c.fillRect(X+2,Y+2,CELL-4,.8); }
+  if(B.length&&has9('cafe')){ const b=B[0], X=PAD+b.x*CELL, Y=PAD+b.y*CELL; c.fillStyle='#2b2b30'; rr(c,X+3,Y+3,10,9,1.5); c.fill(); c.fillStyle='#c9d0d6'; c.fillRect(X+4,Y+4,8,2); c.fillStyle='#6a3d20'; c.beginPath(); c.arc(X+8,Y+9.5,1.6,0,6.3); c.fill(); }
+  if(B.length&&has9('tireuse')){ const b=B[B.length-1], X=PAD+b.x*CELL, Y=PAD+b.y*CELL; for(let k=0;k<3;k++){ c.fillStyle='#c9d0d6'; c.fillRect(X+3.5+k*3.5,Y+4,2,8); c.fillStyle=['#e8b23a','#7a3a1a','#f0d070'][k]; c.beginPath(); c.arc(X+4.5+k*3.5,Y+4,1.5,0,6.3); c.fill(); } }
+  // toilettes rénovées / distributeurs design / ronde de propreté
+  for(const t of ((C.L&&C.L.T)||[])){ const X=PAD+t.x*CELL, Y=PAD+t.y*CELL;
+    if(has9('toilrenov')){ c.strokeStyle='rgba(40,140,170,.9)'; c.lineWidth=1.2; rr(c,X+1,Y+1,CELL-2,CELL-2,2); c.stroke(); emo(c,'✨',X+CELL-3,Y+3,5); }
+    if(has9('savon')){ c.fillStyle='#e9f7fb'; rr(c,X+1.5,Y+CELL-6,4,4.5,1); c.fill(); c.fillStyle='#3aa0c8'; c.fillRect(X+2.5,Y+CELL-5,2,1.2); }
+    if(has9('ronde')){ c.fillStyle='#ffd34d'; c.beginPath(); c.moveTo(X+CELL-5,Y+CELL-1.5); c.lineTo(X+CELL-3,Y+CELL-6); c.lineTo(X+CELL-1,Y+CELL-1.5); c.closePath(); c.fill(); } }
+  // cuisine : ustensiles, inox, hotte, four mixte, mise en place
+  const Fs=(C.L&&C.L.F)||[], Ps=(C.L&&C.L.P)||[], Rs=(C.L&&C.L.R)||[], Ss=(C.L&&C.L.S)||[];
+  if(has9('hotte')) for(const f of Fs){ const X=PAD+f.x*CELL, Y=PAD+f.y*CELL; c.fillStyle='rgba(150,160,168,.55)'; c.fillRect(X-1,Y-1,CELL+2,CELL+2); c.strokeStyle='rgba(60,70,80,.7)'; c.lineWidth=.5; for(let k=2;k<CELL;k+=3){ c.beginPath(); c.moveTo(X+k,Y+1); c.lineTo(X+k,Y+CELL-1); c.stroke(); } }
+  if(has9('four')&&Fs.length){ const f=Fs[Fs.length-1], X=PAD+f.x*CELL, Y=PAD+f.y*CELL; c.fillStyle='#3a3f45'; rr(c,X+2,Y+2,CELL-4,CELL-4,1.5); c.fill(); c.fillStyle='rgba(255,150,50,.85)'; rr(c,X+4,Y+5,CELL-8,CELL-10,1); c.fill(); c.fillStyle='#d0d6da'; c.fillRect(X+4,Y+3,CELL-8,1); }
+  if(has9('inox')) for(const p of Ps){ const X=PAD+p.x*CELL, Y=PAD+p.y*CELL; const g=c.createLinearGradient(X,Y,X+CELL,Y+CELL); g.addColorStop(0,'rgba(255,255,255,.55)'); g.addColorStop(1,'rgba(255,255,255,0)'); c.fillStyle=g; c.fillRect(X+.5,Y+.5,CELL-1,CELL-1); }
+  if(has9('couteaux')&&Ps.length){ const p=Ps[0], X=PAD+p.x*CELL, Y=PAD+p.y*CELL; c.fillStyle='#2b2b30'; c.fillRect(X+2,Y+1,CELL-4,1.5); for(let k=0;k<4;k++){ c.fillStyle='#e6eaee'; c.fillRect(X+3+k*2.6,Y+2.5,1,4); } }
+  if(has9('mep')&&Ps.length>1){ const p=Ps[1], X=PAD+p.x*CELL, Y=PAD+p.y*CELL; ['#d9533f','#5aa65a','#e8d44a','#f0f0f0'].forEach((col,k)=>{ c.fillStyle='#aab3ba'; c.fillRect(X+2+(k%2)*6,Y+3+((k/2)|0)*6,5,5); c.fillStyle=col; c.fillRect(X+2.8+(k%2)*6,Y+3.8+((k/2)|0)*6,3.4,3.4); }); }
+  // réserve : chambre froide, étagères, cellier, étiquetage FIFO
+  if(has9('froid')) for(const r of Rs){ const X=PAD+r.x*CELL, Y=PAD+r.y*CELL; c.fillStyle='rgba(150,210,245,.45)'; c.fillRect(X,Y,CELL,CELL); emo(c,'❄️',X+CELL/2,Y+CELL/2,7); }
+  if(has9('etageres')) for(const s of Ss){ const X=PAD+s.x*CELL, Y=PAD+s.y*CELL; c.fillStyle='rgba(60,40,20,.8)'; for(let k=0;k<3;k++) c.fillRect(X+1,Y+3+k*4.5,CELL-2,.9); }
+  if(has9('cellier')&&Ss.length){ const s=Ss[Ss.length-1], X=PAD+s.x*CELL, Y=PAD+s.y*CELL; c.fillStyle='#5a2a2a'; c.fillRect(X+1,Y+1,CELL-2,CELL-2); for(let i=0;i<3;i++) for(let j=0;j<3;j++){ c.fillStyle=(i+j)%2?'#7a1f2e':'#2f4a2a'; c.beginPath(); c.arc(X+4+i*4,Y+4+j*4,1.4,0,6.3); c.fill(); } }
+  if(has9('fifo')) for(const s of Ss.slice(0,3)){ const X=PAD+s.x*CELL, Y=PAD+s.y*CELL; c.fillStyle='#fff6c0'; c.fillRect(X+CELL-6,Y+1.5,4.5,2.5); }
+  // terrasse devant l'entrée (sur le trottoir) : parasols, chauffage, fleurs, terrasse chauffée
+  if(E){ const ox=E.ox||0, oy=E.oy||0; const cx=PAD+(E.x+.5)*CELL+ox*PAD*0.55, cy=PAD+(E.y+.5)*CELL+oy*PAD*0.55; const tx=oy?1:0, ty=ox?1:0; /* axe le long de la façade */
+    const spot=k=>({x:cx+tx*CELL*k,y:cy+ty*CELL*k});
+    if(dec9('terrasse')) for(const k of [-3,-2,2,3]){ const p=spot(k); c.fillStyle='#b07a4c'; c.beginPath(); c.arc(p.x,p.y,3.2,0,6.3); c.fill(); c.fillStyle='#2e2420'; for(const s of [-1,1]){ c.beginPath(); c.arc(p.x+s*4.2*tx+s*0*ty,p.y+s*4.2*ty,1.4,0,6.3); c.fill(); } }
+    if(has9('parasols')) for(const k of [-2.5,2.5]){ const p=spot(k); c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.arc(p.x+1,p.y+1.5,6,0,6.3); c.fill(); for(let a=0;a<8;a++){ c.fillStyle=a%2?'#f4efe6':'#a3293c'; c.beginPath(); c.moveTo(p.x,p.y); c.arc(p.x,p.y,6,a*Math.PI/4,(a+1)*Math.PI/4); c.closePath(); c.fill(); } }
+    if(has9('chauff')||dec9('terrasse')) for(const k of [-4,4]){ const p=spot(k); const g=c.createRadialGradient(p.x,p.y,0,p.x,p.y,7); g.addColorStop(0,'rgba(255,140,40,.7)'); g.addColorStop(1,'rgba(255,140,40,0)'); c.fillStyle=g; c.beginPath(); c.arc(p.x,p.y,7,0,6.3); c.fill(); c.fillStyle='#555'; c.beginPath(); c.arc(p.x,p.y,1.8,0,6.3); c.fill(); }
+    if(has9('fleurs')) for(const k of [-1.3,1.3]){ const p=spot(k); c.fillStyle='#a0522d'; rr(c,p.x-3,p.y-1.8,6,3.6,1); c.fill(); ['#e84a6f','#ffd34d','#b05ae8'].forEach((col,i)=>{ c.fillStyle=col; c.beginPath(); c.arc(p.x-2+i*2,p.y-1.2,1.1,0,6.3); c.fill(); }); }
+    if(S.mich&&S.mich.star){ const p=spot(-0.75); c.fillStyle='#b22c2c'; rr(c,p.x-3,p.y-3,6,6,1); c.fill(); txt(c,'★',p.x,p.y+.3,5,'#fff','900'); } }
+  // sonnette de cuisine (déjà installée) sur chaque passe
+  for(const q of ((C.L&&C.L.Q)||[])){ const X=PAD+q.x*CELL, Y=PAD+q.y*CELL; c.fillStyle='#d9b85a'; c.beginPath(); c.arc(X+CELL-3.5,Y+3.5,2.4,Math.PI,0); c.fill(); c.fillRect(X+CELL-6.2,Y+3.4,5.4,.9); c.fillStyle='#8a6d2a'; c.beginPath(); c.arc(X+CELL-3.5,Y+1,0.6,0,6.3); c.fill(); }
+ }catch(e){ console.error('v9Decor',e); } }
+{ const _db=drawBG; drawBG=function(){ const k=bgKeyNow(); const need=!(SC.bg&&SC.bgKey===k); _db(); if(need&&SC.bg){ try{ const c=SC.bg.getContext('2d'); const sx=SC.scale*SC.dpr; c.save(); c.setTransform(sx,0,0,sx,SC.ox*SC.dpr,SC.oy*SC.dpr); c.beginPath(); c.rect(0,0,WW,WH); c.clip(); v9Decor(c,layout().C,S.plan); c.restore(); }catch(e){ console.error(e); } } }; }
+{ const _pf=paintPlanFull; paintPlanFull=function(c,C,pl,o){ _pf(c,C,pl,o); try{ v9Decor(c,C,pl); }catch(e){} }; }
+{ const _pi=planImage; planImage=function(pl,C,k){ const sg=v9DecorSig(); if(PPC.sig!==sg){ PPC.key=''; PPC.sig=sg; } return _pi(pl,C,k); }; }
+/* clignotement de la sonnette quand un plat est prêt */
+{ const _cd=chicDyn; chicDyn=function(cx){ _cd(cx); try{ if(BELL9.flash!=null&&S.t-BELL9.flash<1.2){ const C=layout().C; for(const q of ((C.L&&C.L.Q)||[])){ const X=PAD+q.x*CELL, Y=PAD+q.y*CELL; const a=0.5+0.5*Math.sin((SC.tt||0)*20); cx.fillStyle='rgba(255,230,120,'+(0.55*a)+')'; cx.beginPath(); cx.arc(X+CELL-3.5,Y+2.5,5,0,6.3); cx.fill(); emo(cx,'🛎️',X+CELL-3.5,Y-4,7); } } }catch(e){} }; }
+/* catalogue : rappel que l'achat est visible */
+{ const _ur=upgRow; upgRow=function(u){ let h=_ur(u); if(upgOn(u.id)&&u.c>0) h=h.replace('Installé ✔','Installé ✔ · visible sur le plan'); return h; }; }
+
+
+/* ########## w9_team.js ########## */
+/* =====================================================================
+   V9 · ÉQUIPE : fiche patron au même format que les employés (formations patron
+   conservées), sections « Équipe & organisation » et « Formations & souhaits »
+   retirées dès la fin de la pré-ouverture, cagnotte des pourboires
+   ===================================================================== */
+const v9PostPreo=()=>dayNum()>=OPEN_DAY;
+patronCard=function(){ const P=S.patron||{sk:{},trn:[],cap:10}; const sk=P.sk||{}, cap=P.cap||10;
+  const SKN=[['gest','📊','Gestion'],['acc','🤝','Accueil client'],['cook','👨‍🍳','Cuisine'],['somm','🍷','Sommellerie'],['dish','🧽','Plonge'],['fame','📣','Notoriété']];
+  let b='<div class="row"><span class="em">👤</span><div class="grow"><b>Patron · '+rName()+'</b><small>Gérant · niveau '+Math.round(SKN.reduce((a,x)=>a+(sk[x[0]]||0),0)/SKN.length)+'/'+cap+' · ✅ Disponible</small></div><div class="pr"><b>—</b><small>pas de salaire</small></div></div>'
+   +'<div class="chips"><span class="chip">👔 Propriétaire</span><span class="chip ok">🔄 Polyvalent</span><span class="chip ok">🍷 Sommelier</span><span class="chip ok">🧽 Capable plonge</span><span class="chip">💶 hors cagnotte pourboires</span></div>'
+   +'<div class="stats">'+SKN.map(x=>'<div class="stat"><small>'+x[2].replace(' client','')+'</small>'+bar((sk[x[0]]||0)/cap*100,'var(--gold)')+'<b>'+(sk[x[0]]||0)+'</b></div>').join('')+'</div>'
+   +'<small class="xpl">Formations du patron (plafond '+cap+'/'+cap+(cap<20?' · 20 après une étoile Michelin':'')+')</small><div class="trg">'
+   +PATRON_TRN.map(t=>{ const done=(P.trn||[]).includes(t.id), max=(sk[t.id]||0)>=cap; return '<button class="tr" data-a="ptrn" data-p="'+t.id+'"'+(done||max?' disabled':'')+'><span>'+t.e+' '+t.n+'</span><i class="lvl">'+(done?'●':'○')+'</i><small>'+(done?'suivie ✔':max?'niveau max':'Former · '+fm(t.c))+'</small></button>'; }).join('')+'</div>'
+   +'<small class="muted">'+PATRON_TRN.map(t=>t.e+' '+t.d).join(' · ')+'</small>';
+  return '<h4 class="sec">Patron</h4>'+card('',b); };
+{ const _vt=viewTeam; viewTeam=function(){ if(!v9PostPreo()) return _vt();
+  let h=''; try{ const t=trainCard()||''; const i=t.indexOf('<section class="card '); const j=t.indexOf('🎓 Formations & souhaits');
+    if(j>=0){ const k=t.lastIndexOf('<section',j); h+=t.slice(0,k); } else h+=t; }catch(e){}
+  try{ h+=v9TipCard(); }catch(e){ console.error(e); }
+  return h+viewTeam_v5(); }; }
+VIEWS.team=function(){ try{ v8MichelinCheck(); }catch(e){} return patronCard()+viewTeam(); };
 
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
