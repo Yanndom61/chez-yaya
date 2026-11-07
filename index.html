@@ -861,7 +861,7 @@ function genPromos_v5(){
 }
 /* ---------- Menu du jour (v5) : carte du jour automatique, 30 portions réservées ---------- */
 let QUIET=false;
-const MDJ_CAP = 30;
+const MDJ_CAP = 60;
 const MDJ_F = {ep:{n:'Entrée + Plat',c:['ent','plat'],w:0.34}, pd:{n:'Plat + Dessert',c:['plat','dess'],w:0.36}, epd:{n:'Entrée + Plat + Dessert',c:['ent','plat','dess'],w:0.30}};
 const MDJ_SLOT = {ent:'entree',plat:'plat',dess:'dessert'};
 const MDJ_P0 = {ep:17,pd:17,epd:22};
@@ -1051,7 +1051,7 @@ function absentDay(s,d){ d=d||dayNum(); if(s.ct&&(d<s.ct.from||d>s.ct.end)) retu
   return absWeekday(s,(d-1)%7); }
 function freezeToday(){ const d=dayNum(); for(const s of S.staff) s.absD={d,v:(s.ct&&(d<s.ct.from||d>s.ct.end))||onLeave(s,d)||absWeekday(s,(d-1)%7)}; }
 const working = s=>!s.off&&!s.trn&&!absentDay(s)&&worksOK(s);
-const avail = s=>working(s)&&inWin(segOf(s),minOfDay());
+let avail = s=>working(s)&&inWin(segOf(s),minOfDay());
 const worksSvc = (s,svc)=>segSvc(segOf(s),svc);
 const SVCS_OF = role=>role==='cook'||role==='dish'?['lunch','dinner']:['lunch','drinks','dinner'];
 function coverOn(d,role,svc){ return S.staff.filter(s=>s.role===role&&!absentDay(s,d)&&worksSvc(s,svc)).length; }
@@ -2671,9 +2671,9 @@ function viewMDJ(){
   const rem=m.res.plat, out=m.on&&m.cap>0&&rem<=0;
   const left=S.mdjLeft||0;
   h+=card('⭐ Menu du jour · '+dowName(dayNum()),
-    '<div class="mdjhd"><div class="mdjn '+(out?'bad':rem<=5?'warn':'ok')+'"><b>'+(m.on?rem:0)+'</b><span>/ '+MDJ_CAP+'</span></div><div class="grow"><b>'+(out?'ÉPUISÉ':m.on?(rem<=5?'Presque épuisé':'Portions restantes'):'Retiré de la vente')+'</b><small>'+(m.cap<MDJ_CAP&&m.on?'⚠️ Stock insuffisant : seulement '+m.cap+' portions préparées ce matin. ':'')+'Vendu aujourd’hui : <b>'+m.nSold+'</b> · 30 portions max. (midi + soir), servies de 12h à 15h et de 19h à 23h30.</small></div></div>'+
+    '<div class="mdjhd"><div class="mdjn '+(out?'bad':rem<=5?'warn':'ok')+'"><b>'+(m.on?rem:0)+'</b><span>/ '+MDJ_CAP+'</span></div><div class="grow"><b>'+(out?'ÉPUISÉ':m.on?(rem<=5?'Presque épuisé':'Portions restantes'):'Retiré de la vente')+'</b><small>'+(m.cap<MDJ_CAP&&m.on?'⚠️ Stock insuffisant : seulement '+m.cap+' portions préparées ce matin. ':'')+'Vendu aujourd’hui : <b>'+m.nSold+'</b> · 60 portions max. (midi + soir), servies de 12h à 15h et de 19h à 23h30.</small></div></div>'+
     bar(m.on?rem/MDJ_CAP*100:0,out?'var(--bad)':rem<=5?'var(--warn)':'var(--ok)')+
-    '<p class="muted">Chaque matin, de <b>nouveaux plats</b> (jamais à la carte) sont composés à partir des produits en promotion, sinon de votre stock. Les ingrédients de <b>30 portions</b> sont prélevés dès le matin ; ce qui reste le soir va au <b>repas du personnel</b> de 11h30 le lendemain.'+(left>0?' Restes d’hier prévus : <b>'+left+'</b> portion'+(left>1?'s':'')+'.':'')+'</p>'+
+    '<p class="muted">Chaque matin, de <b>nouveaux plats</b> (jamais à la carte) sont composés à partir des produits en promotion, sinon de votre stock. Les ingrédients de <b>60 portions</b> sont prélevés dès le matin ; ce qui reste le soir va au <b>repas du personnel</b> de 11h30 le lendemain.'+(left>0?' Restes d’hier prévus : <b>'+left+'</b> portion'+(left>1?'s':'')+'.':'')+'</p>'+
     mdjSel('ent','Entrée')+mdjSel('plat','Plat')+mdjSel('dess','Dessert')+
     (m.nSold>0?'<p class="muted">Le service a commencé : les plats sont figés pour aujourd’hui (les prix restent modifiables).</p>':'')+
     '<div class="btnrow">'+(m.on?btn('Compléter la réserve','mdjtop',null,null,'ghost',m.cap>=MDJ_CAP)+btn('Retirer de la vente','mdjvalid','off',null,'ghost'):btn('Remettre en vente','mdjvalid','on',null,'primary'))+'</div>',out?'cardwarn':(m.on?'cardok':'cardwarn'));
@@ -4447,7 +4447,7 @@ PANELS.drinks={t:()=>'🍷 Cartes des boissons',f(){ return drinksBody()+'<div c
 function mdjfBody(){
   const lst=f=>MDJ_F[f].c.reduce((a,c)=>a+({ent:6.5,plat:13,dess:6.5}[c]||0),0);
   const typ={ep:'mdjpe',pd:'mdjpd',epd:'mdjpf'};
-  let h='<div class="card">'+dialogue({e:'⭐',n:'Chef & responsable'},'« Le menu du jour change <b>chaque matin</b> (30 portions sur place + 10 à emporter). Vous fixez ici le prix des trois formules. »')+'</div>';
+  let h='<div class="card">'+dialogue({e:'⭐',n:'Chef & responsable'},'« Le menu du jour change <b>chaque matin</b> (60 portions sur place + 10 à emporter). Vous fixez ici le prix des trois formules. »')+'</div>';
   for(const f of ['ep','pd','epd']){ const P=S.mdjP[f]; h+='<div class="card"><div class="row" style="display:flex;align-items:center;gap:8px"><div style="flex:1"><b>'+MDJ_F[f].n+'</b><small>Prix conseillé ≈ '+fp(MDJ_P0[f])+'</small></div>'+stepper(typ[f],null,P,0.5,{dec:1,w:62,unit:'€',lab:'Prix '+MDJ_F[f].n})+'</div><div class="chips"><span class="chip '+(P<=MDJ_P0[f]*1.15?'ok':'warn')+'">'+(P<MDJ_P0[f]?'Prix attractif':P<=MDJ_P0[f]*1.15?'Prix correct':'Prix élevé')+'</span></div></div>'; }
   return h; }
 PANELS.mdjf={t:()=>'⭐ Menu du jour · formules',f(){ return mdjfBody()+'<div class="btnrow">'+btn('Valider les formules ✔','mdjok',null,null,'primary')+'</div>'; }};
@@ -5364,7 +5364,7 @@ const FEST_D=[
 const FEST_P={noel:{n:'Menu de Noël',e:'🎄'},sylv:{n:'Menu de la Saint-Sylvestre',e:'🥂'},valent:{n:'Menu de la Saint-Valentin',e:'💘'},paques:{n:'Menu de Pâques',e:'🐣'},meres:{n:'Menu de la fête des mères',e:'💐'},peres:{n:'Menu de la fête des pères',e:'👔'},j14:{n:'Menu du 14 juillet',e:'🎆'},hallo:{n:'Menu d’Halloween',e:'🎃'},epiph:{n:'Galette des rois',e:'👑'},chand:{n:'Chandeleur',e:'🥞'},beauj:{n:'Beaujolais nouveau',e:'🍷'},vac:{n:'Menu des vacances scolaires',e:'🧳'}};
 for(const [id,cat,e,n,ref,prep,q,rec,al] of NEWD){ DISH[id]={n,e,cat,ref,prep,q,pop:0.9,rec,al,veg:!Object.keys(rec).some(i=>ING[i].meat),gf:!al.includes('gluten')}; }
 for(const [id,per,cat,e,n,ref,prep,q,rec,al] of FEST_D){ DISH['f_'+id]={n,e,cat,ref,prep,q,pop:1.5,rec,al,fest:per,veg:!Object.keys(rec).some(i=>ING[i].meat),gf:!al.includes('gluten')}; }
-const festIds=per=>FEST_D.filter(x=>x[1]===per).map(x=>'f_'+x[0]);
+let festIds=per=>FEST_D.filter(x=>x[1]===per).map(x=>'f_'+x[0]);
 /* fenêtres de chaque période pour une année civile */
 function festWin(k,y){ const E=easterSer(y), S0=(m,d,yy)=>serOf(yy||y,m,d);
   switch(k){ case 'noel': return [S0(11,19),S0(11,26)]; case 'sylv': return [S0(11,29),S0(11,31)+1]; case 'valent': return [S0(1,10),S0(1,14)]; case 'paques': return [E-3,E+1];
@@ -7354,6 +7354,405 @@ setTimeout(()=>{ try{ if(S&&S.patron){ if(S.patron.away&&!S.patron.away.until) S
     document.querySelectorAll('[data-ed="tool"] small').forEach(s=>{ if(/€/.test(s.textContent)) s.textContent='offert'; });
   } }catch(e){}
   return r; }; })();
+
+/* ===== v9.5 part a ===== */
+/* ########## w95.js ########## */
+/* =====================================================================
+   V9.5 · STOCKS « jamais à court » · MENU DU JOUR 60 · FÊTES A/B · GROUPES PRIVATISÉS · DÉCO
+   ===================================================================== */
+function V95(){ S.v95=S.v95||{}; const v=S.v95; if(v.marg==null) v.marg=20; if(v.bor==null) v.bor=1; v.borL=v.borL||[]; v.borD=v.borD||{}; if(v.nappe==null) v.nappe=''; v.rupt=v.rupt||{}; v.crsL=v.crsL||[]; return v; }
+/* ---------- 1) MEUBLES DE STOCKAGE (éditeur › Stockage) ---------- */
+const V95ST={k:{n:'Petit congélateur',e:'🧊',cap:150,f:0.25,col:'#dfe9f1'},K:{n:'Grand congélateur',e:'❄️',cap:300,f:0.45,col:'#cfe0ee'},C:{n:'Chambre froide',e:'🥶',cap:600,f:0.8,col:'#bcd3e6'},e:{n:'Étagère de stockage',e:'🗄️',cap:80,f:0,col:'#c79a64'}};
+PCATS.push(['sk','Stockage'],['ev','Événements']);
+for(const k in V95ST){ const s=V95ST[k]; PITEM[k]={n:s.n,e:s.e,cat:'sk',cost:0,v95st:1}; }
+function v95StoreCnt(pl){ const C=compilePlan(pl||S.plan), o={}; for(const k in V95ST) o[k]=C.cnt[k]||0; return o; }
+function v95StoreCap(pl){ const n=v95StoreCnt(pl); let c=0; for(const k in V95ST) c+=n[k]*V95ST[k].cap; return c; }
+frigoFactor=function(){ const C=compilePlan(S.plan); let f=0.3*(C.cnt.R||0); for(const k in V95ST) f+=(C.cnt[k]||0)*V95ST[k].f; return 1/(1+f); };
+shelfOf=function(i){ let d=SHELF[i]||30; d*=1+upgEff('cons'); if(ING[i].sp>0.05){ const f=1/frigoFactor(); if(f>1.01) d=Math.round(d*Math.min(3.2,f)); } return d; };
+/* capacité supplémentaire répartie sur les produits utilisés (au prorata des ventes, moitié à parts égales) */
+let _v95capC=null;
+function v95CapBonus(i){ const tot=v95StoreCap(); if(!tot) return 0; if(!_v95capC||_v95capC.t!==S.t||_v95capC.tot!==tot){ const cu=carteUse(), ms=mdjCarteSet(); const ids=Object.keys(ING).filter(x=>cu[x]||ms[x]); let W=0; const w={}; for(const x of ids){ w[x]=Math.max(0.5,useBase(x)||0); W+=w[x]; }
+    const b={}; for(const x of ids) b[x]=Math.round(tot*(0.5/ids.length+0.5*w[x]/(W||1))); _v95capC={t:S.t,tot,b}; }
+  return _v95capC.b[i]||0; }
+{ const _cap=capOf; capOf=function(i){ return _cap(i)+v95CapBonus(i); }; }
+/* ---------- 2) MARGE DE SÉCURITÉ RÉGLABLE (0 → 50 %) ---------- */
+autoTarget=function(i){ const cap=capOf(i), H=v9CoverDays(i), d0=(S.trav&&worksNow())?S.trav.end+1:dayNum(); let t=0;
+  for(let k=0;k<Math.ceil(H);k++){ const f=Math.min(1,H-k); t+=v9DayUse(i,d0+k)*f; }
+  t*=1+(V95().marg||0)/100;
+  if(t<=0) return 0; return Math.min(cap,Math.max(needOf(i)||1,Math.ceil(t))); };
+/* ---------- 3) PRÉVISION : réservations + météo ---------- */
+function v95ResCov(d){ let n=0; for(const r of (S.res||[])){ if(!(r.state==='booked'||r.state==='confirmed'||!r.state)) continue; if(Math.floor(r.t/1440)+1===d) n+=r.size||0; } return n; }
+{ const _fc=fcF; fcF=function(d){ const b=_fc(d); if(!b) return b; const rc=v95ResCov(d); if(!rc) return b; const seats=Math.max(10,evSeats()); return b*(1+Math.min(0.3,rc/(seats*2)*0.6)); }; }
+/* produits de saison / locaux : moins chers */
+const V95SEAS={legumes:[3,4,5,6,7,8,9],fruits:[4,5,6,7,8],pomme:[8,9,10,11,0,1],poisson:[0,1,2,3,4,5,6,7,8,9,10,11],fromage:[3,4,5,6,7,8,9,10],volaille:[8,9,10,11]};
+const v95Seasonal=i=>!!(V95SEAS[i]&&V95SEAS[i].includes(calMonth()));
+{ const _sp=supPrice; supPrice=function(sid,i){ let p=_sp(sid,i); if(v95Seasonal(i)&&(sid==='marche'||sid==='bio')) p*=0.9; return p; }; }
+/* ---------- 4) FAIRE LES COURSES SOI-MÊME ---------- */
+const V95CRS={mar:{n:'Marché local',e:'🧺',dur:120,m:1.20*0.85,sup:'marche',d:'Produits frais et de saison, −15 % · le patron s’absente ≈ 2 h'},
+  gro:{n:'Grossiste (cash & carry)',e:'🏭',dur:180,m:0.75,sup:'gros',d:'Produits secs, boissons, en gros, −25 % · le patron s’absente ≈ 3 h'},
+  exp:{n:'Livraison express',e:'🛵',dur:45,m:1.20*1.40,sup:'marche',d:'Tout ce qui manque, livré en 45 min, +40 %'}};
+function v95CrsCart(k){ const cu=carteUse(), ms=mdjCarteSet(), cart={}; const mx=mdjMissing();
+  for(const i in ING){ if(!(cu[i]||ms[i]||evtSoon(i)>0)) continue; const fresh=ING[i].sp>0.05; if(k==='mar'&&!fresh) continue; if(k==='gro'&&fresh) continue;
+    let need=Math.max(autoTarget(i),Math.ceil(mx[i]||0),Math.ceil(evtSoon(i)*1.05))-Math.floor(S.stock[i].q)-incoming(i); if(need<1) continue;
+    if(k==='gro') need=Math.ceil(need/10)*10; need=Math.min(need,Math.max(0,capOf(i)-Math.floor(S.stock[i].q)-incoming(i))); if(need>=1) cart[i]=need; }
+  return cart; }
+function v95CrsPrice(k,i){ let p=ING[i].p*infl(i)*V95CRS[k].m; if(k==='mar'&&v95Seasonal(i)) p*=0.9; return p; }
+function v95CrsCost(k,cart){ let t=0; for(const i in cart) t+=cart[i]*v95CrsPrice(k,i); return t; }
+function v95Crs(k){ const C=V95CRS[k]; if(!C) return {ok:false,msg:''}; const P=S.patron;
+  if(k!=='exp'){ if(S.awaitNext) return {ok:false,msg:'Les magasins sont fermés : revenez demain matin.'}; if(v94PAway()) return {ok:false,msg:'Vous êtes déjà absent (formation ou courses).'}; }
+  const cart=v95CrsCart(k); const n=Object.keys(cart).length; if(!n) return {ok:false,msg:'Rien à acheter : vos stocks couvrent déjà le besoin (marge '+V95().marg+' %).'};
+  const cost=v95CrsCost(k,cart); if(cost>S.cash) return {ok:false,msg:'Trésorerie insuffisante ('+money(cost)+').'};
+  S.cash-=cost; S.day.purch+=cost; const unit={}; for(const i in cart) unit[i]=v95CrsPrice(k,i);
+  const base=S.awaitNext?nextOpen():S.t, eta=base+C.dur;
+  S.orders.push({id:nid(),sup:C.sup,items:cart,unit,eta,cost,v95:k});
+  if(k!=='exp'&&P){ P.away={k:'crs',until:eta,cost:0,crs:k}; P.v94gone=0; }
+  V95().crsL.push({d:dayNum(),k,n,cost:Math.round(cost)}); if(V95().crsL.length>20) V95().crsL.shift();
+  note(C.e+' '+C.n+' : '+n+' produit(s) pour '+money(cost)+' · '+(k==='exp'?'livraison à ':'retour du patron à ')+hhmm(eta%1440)+'.','info');
+  return {ok:true,msg:C.n+' : '+n+' produit(s), '+money(cost)+' · arrivée à '+hhmm(eta%1440)+'.'}; }
+{ const _pf=v94PFinish; v94PFinish=function(){ const P=S&&S.patron; if(P&&P.away&&P.away.crs){ if(S.t<P.away.until) return; const k=P.away.crs; P.away=null; P.v94gone=0; note('🛒 Le patron est revenu des courses ('+V95CRS[k].n+').','good'); return; } _pf(); }; }
+{ const _pc=patronCard; patronCard=function(){ let h=_pc(); const A=S.patron&&S.patron.away; if(A&&A.crs&&S.t<A.until) h=h.replace(/🎓 En formation « [^»]*» · retour/,'🛒 Parti faire les courses ('+V95CRS[A.crs].n+') · retour'); return h; }; }
+/* ---------- 5) FILET DE SÉCURITÉ : emprunt aux voisins puis livraison express automatique ---------- */
+const V95NB=['Chez Simone','Le Petit Zinc','Boulangerie Martin','Brasserie du Port','La Cantine de Paul'];
+function v95Guard(){ if(!S||S.awaitNext||dayNum()<OPEN_DAY) return; const m=minOfDay(); if(m<DAYSTART||m>=LASTARR) return; if(worksNow()||closedNow()) return; const v=V95(); if(!v.bor) return;
+  if(S._v95g&&S.t-S._v95g<10) return; S._v95g=S.t; const d=dayNum(); const cu=carteUse(), ms=mdjOpen()&&S.mdj.on?mdjCarteSet():{};
+  for(const i in ING){ if(!(cu[i]||ms[i])) continue; const st=S.stock[i]; if(!st) continue; const n=needA(i)||1; if(st.q>=n*1.5) continue; if(incoming(i)>0) continue;
+    const left=v9DayUse(i,d)*v9FracLeft(m); let q=Math.ceil(Math.max(n*4,left*1.1-st.q)); q=Math.min(q,Math.max(n*2,capRoom(i))); if(q<1) continue;
+    const nb=v.borD[d]||0, unit=ING[i].p*infl(i)*1.1;
+    if(nb<4){ const who=V95NB[(d+nb)%V95NB.length]; lotSync(i); lotAdd(i,q,'marche'); const nq=st.q+q; st.cost=nq?(st.q*st.cost+q*unit)/nq:unit; st.q=nq; const c=q*unit; S.cash-=c; S.day.purch+=c; v.borD[d]=nb+1;
+      v.borL.push({d,i,q,who,c:Math.round(c*100)/100}); if(v.borL.length>30) v.borL.shift(); for(const k of Object.keys(v.borD)) if(+k<d-3) delete v.borD[k];
+      note('🤝 '+who+' vous dépanne : '+ING[i].e+' '+q+' '+ING[i].n+' (rendu ×1,1 = '+money(c)+').','info'); }
+    else { const cart={}; cart[i]=q; const un={}; un[i]=v95CrsPrice('exp',i); const c=q*un[i]; if(c>S.cash) continue; S.cash-=c; S.day.purch+=c; S.orders.push({id:nid(),sup:'marche',items:cart,unit:un,eta:S.t+45,cost:c,v95:'exp'});
+      note('🛵 Livraison express automatique : '+ING[i].e+' '+q+' '+ING[i].n+' ('+money(c)+', 45 min).','info'); } } }
+{ const _ac=autoCheck; autoCheck=function(){ _ac(); try{ v95Guard(); }catch(e){ console.error(e); } }; }
+/* ---------- 6) RUPTURE : prévenir dès la prise de commande + plat équivalent ---------- */
+function v95Alt(id,diet,alg){ const cat=DISH[id].cat; const c=Object.keys(DISH).filter(x=>x!==id&&DISH[x].cat===cat&&S.menu[x]&&S.menu[x].on&&dishAvail(x)&&dietOk(x,diet)&&!(alg&&DISH[x].al.includes(alg)));
+  if(!c.length) return null; return pickWeighted(c,x=>(DISH[x].pop||1)*(DISH[x].fest?1.3:1)); }
+{ const _op=orderPicks; orderPicks=function(g){ const P=_op(g); try{ const v=V95(), d=dayNum(); for(const p of P){ if(!p.d||p.mdj||p.none||!DISH[p.d]||DISH[p.d].mdjd) continue; if(dishAvail(p.d)) continue;
+      const diet=(p.k===0&&g.diet)?g.diet:null, alg=(p.k===0&&g.alg)?g.alg:null; const alt=v95Alt(p.d,diet,alg); if(!alt) continue;
+      const was=p.d; p.d=alt; p.v95alt=1; S.day.v95rupt=(S.day.v95rupt||0)+1; const key=d+'|'+was; if(!v.rupt[key]){ v.rupt[key]=1; note('🙋 Rupture annoncée à la commande : '+DISH[was].n+' épuisé — les clients choisissent '+DISH[alt].n+' (sans mécontentement).','info'); }
+      for(const k of Object.keys(v.rupt)) if(+k.split('|')[0]<d-2) delete v.rupt[k]; } }catch(e){ console.error(e); } return P; }; }
+
+/* ===== v9.5 part b ===== */
+/* ---------- 7) MENU DU JOUR : grand catalogue, 10 propositions / catégorie, météo, saison, local ---------- */
+// [id, cat, emoji, nom, prix réf., prép., qualité, recette, allergènes, tag (c = frais/froid, w = chaud/réconfort, l = terroir local)]
+const MD95=[
+ ['fr_oignon','entree','🧅','Soupe à l’oignon gratinée',8.5,3,3.9,{oignon:2,pain:1,fromage:1},['gluten','lait'],'wl'],
+ ['fr_escarg','entree','🐌','Croustillant façon escargots, beurre persillé',10,3,3.9,{pain:1,creme:1,legumes:1},['gluten','lait'],'l'],
+ ['fr_lyon','entree','🥗','Salade lyonnaise',9,2.5,3.8,{legumes:1,jambon:1,pain:1},['oeufs','gluten','moutarde'],'cl'],
+ ['fr_nicoise','entree','🥗','Salade niçoise',9.5,2.5,3.8,{legumes:1,poisson:1,patate:1},['poissons','oeufs'],'c'],
+ ['fr_quiche','entree','🥧','Quiche lorraine',8.5,3,3.8,{jambon:1,creme:1,epicerie:1},['gluten','lait','oeufs'],'l'],
+ ['fr_pate','entree','🥖','Pâté en croûte maison',10,3,3.9,{jambon:1,volaille:1,epicerie:1},['gluten','oeufs'],'l'],
+ ['it_burrata','entree','🇮🇹','Burrata, tomates et basilic',10,1.5,3.9,{fromage:1,legumes:1},['lait'],'c'],
+ ['it_carpac','entree','🇮🇹','Carpaccio de bœuf, copeaux de parmesan',11,2,4,{boeuf:1,fromage:1},['lait'],'c'],
+ ['es_gazp','entree','🇪🇸','Salmorejo (gazpacho de Cordoue)',7.5,2,3.7,{legumes:2,pain:1},['gluten'],'c'],
+ ['gr_tzat','entree','🇬🇷','Tzatziki et pain pita',7,1.5,3.6,{creme:1,legumes:1,pain:1},['lait','gluten'],'c'],
+ ['lb_houm','entree','🇱🇧','Houmous et falafels',8,2.5,3.7,{feculents:1,legumes:1,pain:1},['sesame','gluten'],'c'],
+ ['jp_miso','entree','🇯🇵','Soupe miso, tofu et légumes',7.5,2,3.6,{legumes:1,epicerie:1},['soja'],'w'],
+ ['vn_nem','entree','🇻🇳','Nems au poulet',8.5,3,3.7,{volaille:1,legumes:1,feculents:1},['gluten','soja'],'w'],
+ ['pe_cev','entree','🇵🇪','Ceviche de poisson blanc',11,2,4,{poisson:1,legumes:1,fruits:1},['poissons'],'c'],
+ ['fr_bourg','plat','🍷','Bœuf bourguignon',19,5.5,4.1,{boeuf:1,vin:1,oignon:1,patate:1},['sulfites','celeri'],'wl'],
+ ['fr_coqvin','plat','🐓','Coq au vin',19,5.5,4.1,{volaille:1,vin:1,oignon:1,feculents:1},['sulfites','celeri'],'wl'],
+ ['fr_cassoul','plat','🫘','Cassoulet de Castelnaudary',18,5,4,{jambon:1,volaille:1,feculents:1},['celeri'],'wl'],
+ ['fr_chouc','plat','🥬','Choucroute garnie',17.5,4.5,3.9,{jambon:2,legumes:1,patate:1},['moutarde','sulfites'],'wl'],
+ ['fr_ratat','plat','🍆','Ratatouille niçoise et œuf mollet',13.5,4,3.8,{legumes:2,feculents:1},['oeufs'],'c'],
+ ['fr_bouil','plat','🐟','Bouillabaisse du pêcheur',23,5.5,4.3,{poisson:2,patate:1,oignon:1},['poissons','crustaces','celeri'],'w'],
+ ['fr_moules','plat','🦪','Moules marinières, frites',16,4,3.9,{poisson:1,vin:1,patate:1},['mollusques','sulfites'],'l'],
+ ['fr_steak','plat','🥩','Steak frites, sauce au poivre',18.5,4,4,{boeuf:1,patate:1,creme:1},['lait'],''],
+ ['fr_aligot','plat','🧀','Saucisse et aligot de l’Aubrac',16.5,4.5,4,{jambon:1,patate:2,fromage:1},['lait'],'wl'],
+ ['fr_croq','plat','🥪','Croque-monsieur maison, salade',12,3,3.6,{pain:1,jambon:1,fromage:1,legumes:1},['gluten','lait'],''],
+ ['it_risot','plat','🇮🇹','Risotto crémeux aux champignons',15.5,4.5,3.9,{feculents:1,creme:1,fromage:1,legumes:1},['lait'],'w'],
+ ['it_lasag','plat','🇮🇹','Lasagnes à la bolognaise',15,4.5,3.9,{boeuf:1,feculents:1,fromage:1},['gluten','lait','oeufs'],'w'],
+ ['it_osso','plat','🇮🇹','Osso buco à la milanaise',21,5.5,4.2,{veau:1,legumes:1,feculents:1},['celeri','sulfites'],'w'],
+ ['es_paella','plat','🇪🇸','Paella valencienne',19,5.5,4.1,{volaille:1,poisson:1,feculents:1},['poissons','crustaces'],''],
+ ['ma_tajine','plat','🇲🇦','Tajine de poulet aux citrons confits',17,5,4,{volaille:1,legumes:1,feculents:1},['gluten'],'w'],
+ ['ma_cous','plat','🇲🇦','Couscous royal',19,5.5,4.1,{volaille:1,boeuf:1,feculents:1,legumes:1},['gluten','celeri'],'w'],
+ ['in_curry','plat','🇮🇳','Curry de poulet, riz basmati',16,4.5,3.9,{volaille:1,feculents:1,creme:1},['lait'],'w'],
+ ['th_padth','plat','🇹🇭','Pad thaï aux crevettes',16,4,3.9,{poisson:1,feculents:1,legumes:1},['crustaces','arachides','soja','oeufs'],''],
+ ['mx_chili','plat','🇲🇽','Chili con carne',14.5,4,3.8,{boeuf:1,feculents:1,legumes:1},[],'w'],
+ ['hu_goul','plat','🇭🇺','Goulash hongrois',16.5,5,3.9,{paleron:1,patate:1,oignon:1},['celeri'],'w'],
+ ['be_carbo','plat','🇧🇪','Carbonnade flamande',17,5,4,{paleron:1,biere:1,oignon:1,patate:1},['gluten'],'w'],
+ ['gr_mouss','plat','🇬🇷','Moussaka',16,5,3.9,{boeuf:1,legumes:1,creme:1},['lait','gluten'],''],
+ ['jp_ramen','plat','🇯🇵','Ramen au porc et œuf mariné',15,4,3.9,{jambon:1,feculents:1,legumes:1},['gluten','soja','oeufs'],'w'],
+ ['hw_poke','plat','🇺🇸','Poke bowl saumon-avocat',16,3,3.9,{poisson:1,feculents:1,legumes:1},['poissons','soja','sesame'],'c'],
+ ['fr_tatin','dessert','🍎','Tarte Tatin, crème fraîche',8,3,4,{pomme:1,epicerie:1,creme:1},['gluten','lait'],'l'],
+ ['fr_mousse','dessert','🍫','Mousse au chocolat',7,2,3.9,{chocolat:1,creme:1},['lait','oeufs'],''],
+ ['fr_profit','dessert','🍨','Profiteroles, chocolat chaud',8.5,3,4,{chocolat:1,creme:1,epicerie:1},['gluten','lait','oeufs'],'w'],
+ ['fr_paris','dessert','🥯','Paris-Brest',8.5,3.5,4.1,{creme:1,epicerie:1},['gluten','lait','oeufs','coque'],'l'],
+ ['fr_canele','dessert','🧁','Canelés de Bordeaux',6.5,2,3.8,{creme:1,epicerie:1,spirit:1},['gluten','lait','oeufs'],'l'],
+ ['fr_kouign','dessert','🧈','Kouign-amann tiède',7,2.5,3.9,{epicerie:1,creme:1},['gluten','lait'],'wl'],
+ ['fr_madel','dessert','🍋','Madeleines tièdes et crème citron',6.5,2,3.7,{epicerie:1,creme:1,fruits:1},['gluten','lait','oeufs'],''],
+ ['it_tiram','dessert','🇮🇹','Tiramisu maison',7.5,2,4,{creme:1,cafe:1,epicerie:1},['gluten','lait','oeufs'],'c'],
+ ['it_panna','dessert','🇮🇹','Panna cotta, coulis de fruits rouges',6.5,1.5,3.8,{creme:1,fruits:1},['lait'],'c'],
+ ['es_crema','dessert','🇪🇸','Crème catalane',6.5,2,3.8,{creme:1,epicerie:1},['lait','oeufs'],''],
+ ['pt_nata','dessert','🇵🇹','Pastéis de nata',6.5,2.5,3.9,{creme:1,epicerie:1},['gluten','lait','oeufs'],''],
+ ['at_strud','dessert','🇦🇹','Strudel aux pommes',7.5,3,3.9,{pomme:1,epicerie:1},['gluten','lait'],'w'],
+ ['us_cheese','dessert','🇺🇸','Cheesecake New-Yorkais',7.5,2.5,3.9,{fromage:1,creme:1,epicerie:1},['gluten','lait','oeufs'],'c'],
+ ['be_gauf','dessert','🇧🇪','Gaufre de Liège, chantilly',6.5,2,3.7,{epicerie:1,creme:1},['gluten','lait','oeufs'],'w'],
+ ['mx_churro','dessert','🇲🇽','Churros et chocolat chaud',6.5,2,3.7,{epicerie:1,chocolat:1},['gluten','lait'],'w']
+];
+const MD95_TAG={};
+for(const [id,cat,e,n,ref,prep,q,rec,al,tg] of MD95){ const k='m_'+id; if(DISH[k]) continue; const d={n,e,cat,ref,prep,q,pop:1,rec,al,mdjd:1,veg:!Object.keys(rec).some(i=>ING[i].meat),gf:!al.includes('gluten')};
+  Object.defineProperty(DISH,k,{value:d,enumerable:false,writable:true,configurable:true}); MDJ_IDS[cat].push(k); MD95_TAG[k]=tg||''; }
+/* combinaisons générées (base + garniture + sauce) */
+{ const ALG={creme:'lait',fromage:'lait',pain:'gluten',epicerie:'gluten',poisson:'poissons',vin:'sulfites',biere:'gluten'};
+  const mk=(id,cat,e,n,rec,tg)=>{ const k='m_g_'+id; if(DISH[k]) return; let c=0; for(const i in rec) c+=ING[i].p*rec[i]; const ref=Math.max(cat==='plat'?12:6,Math.round((c*3.4+(cat==='plat'?6:3))*2)/2);
+    const al=[...new Set(Object.keys(rec).map(i=>ALG[i]).filter(Boolean))]; const d={n,e,cat,ref,prep:cat==='plat'?4.5:2.5,q:3.7,pop:1,rec,al,mdjd:1,gen:1,veg:!Object.keys(rec).some(i=>ING[i].meat),gf:!al.includes('gluten')};
+    Object.defineProperty(DISH,k,{value:d,enumerable:false,writable:true,configurable:true}); MDJ_IDS[cat].push(k); MD95_TAG[k]=tg||''; };
+  const PR=[['volaille','🍗','Suprême de volaille'],['boeuf','🥩','Bavette de bœuf'],['veau','🍖','Quasi de veau'],['poisson','🐟','Filet de lieu'],['paleron','🥩','Paleron confit'],['jambon','🥓','Jambon braisé']];
+  const SD=[['patate','pommes grenaille'],['feculents','riz pilaf'],['legumes','poêlée de légumes du marché'],['feculents','tagliatelles fraîches']];
+  const SC=[['creme','sauce crème','w'],['vin','jus au vin rouge','w'],['oignon','compotée d’oignons',''],['legumes','vierge aux herbes','c']];
+  PR.forEach((p,a)=>SD.forEach((s,b)=>SC.forEach((z,c)=>{ const rec={}; rec[p[0]]=1; rec[s[0]]=(rec[s[0]]||0)+1; rec[z[0]]=(rec[z[0]]||0)+1; mk('p'+a+b+c,'plat',p[1],p[2]+', '+s[1]+', '+z[1],rec,z[2]); })));
+  const EP=[['Velouté',{creme:1},'w'],['Salade',{},'c'],['Tartine',{pain:1},''],['Cassolette',{creme:1},'w']];
+  const EM=[['legumes','de légumes du marché','🥬'],['fromage','au chèvre chaud','🧀'],['jambon','au jambon de pays','🥓'],['poisson','de la mer','🐟'],['oignon','aux oignons confits','🧅'],['patate','de pommes de terre','🥔']];
+  EP.forEach((p,a)=>EM.forEach((m,b)=>{ const rec=Object.assign({},p[1]); rec[m[0]]=(rec[m[0]]||0)+1; if(p[0]==='Salade'&&!rec.legumes) rec.legumes=1; mk('e'+a+b,'entree',m[2],p[0]+' '+m[1],rec,p[2]); }));
+  const DP=[['Tarte',{epicerie:1,creme:1},''],['Crumble',{epicerie:1},'w'],['Verrine',{creme:1},'c'],['Clafoutis',{creme:1,epicerie:1},'']];
+  const DM=[['fruits','aux fruits rouges','🍓'],['pomme','aux pommes','🍏'],['chocolat','au chocolat','🍫'],['fruits','aux agrumes','🍊']];
+  DP.forEach((p,a)=>DM.forEach((m,b)=>{ const rec=Object.assign({},p[1]); rec[m[0]]=(rec[m[0]]||0)+1; mk('d'+a+b,'dessert',m[2],p[0]+' '+m[1],rec,p[2]); })); }
+const V95COLD=/salade|gazpacho|salmorejo|tartare|carpaccio|sorbet|melon|glac|verrine|ceviche|taboul|tomate|froid|poke|concombre|tzatziki|burrata|panna|vierge|houmous|gaspa/i;
+const V95WARM=/velouté|soupe|gratin|pot-au-feu|braisé|tartif|blanquette|hachis|bourguignon|cassoulet|choucroute|confit|potée|fondant|crumble|cassolette|risotto|chili|curry|tajine|ramen|goulash|carbonnade|aligot|coq au vin|osso|lasagne|couscous|crème|chaud|tiède/i;
+function v95Temp(id){ const t=MD95_TAG[id]||'', n=DISH[id].n; if(t.includes('c')||(!t.includes('w')&&V95COLD.test(n))) return 'c'; if(t.includes('w')||V95WARM.test(n)) return 'w'; return ''; }
+function v95WxKind(d){ const w=weatherOf(d||dayNum()); if(w.t>=22||(w.k==='sun'&&w.t>=19)) return 'hot'; if(w.t<=11||w.k==='rain') return 'cold'; return 'mild'; }
+function v95Local(id){ if((MD95_TAG[id]||'').includes('l')) return true; const r=Object.keys(DISH[id].rec).filter(i=>ING[i].sp>0.05); return r.length>0&&r.every(v95Seasonal); }
+function v95Fit(id){ const k=v95WxKind(), t=v95Temp(id); const wx=k==='hot'?(t==='c'?1:t==='w'?-1:0):k==='cold'?(t==='w'?1:t==='c'?-1:0):0;
+  const sea=!!(DISH[id].season&&DISH[id].season.includes(calMonth()))||Object.keys(DISH[id].rec).some(v95Seasonal); return {wx,sea,loc:v95Local(id),ok:wx>=0&&(sea||v95Local(id))}; }
+function v95Adapted(){ if(!mdjOpen()) return false; const ids=mdjIds(); if(!ids.length) return false; const n=ids.filter(i=>v95Fit(i).ok&&v95Fit(i).wx>=0).length; return n>=Math.min(2,ids.length); }
+{ const _adj=mdjAdj; mdjAdj=function(id){ let s=_adj(id); const f=v95Fit(id); s+=f.wx*1.6+(f.sea?0.6:0)+(f.loc?0.8:0); return s; }; }
+/* listes de 10 propositions par catégorie : renouvelées quand les 10 ont servi */
+const V95CAT={entree:'ent',plat:'plat',dessert:'dess'};
+function v95Feas(id,min){ const r=DISH[id].rec; for(const i in r){ const st=S.stock[i]; if(!st) return false; if(st.q+incoming(i)<r[i]*(min||1)) return false; } return true; }
+function v95NewList(cat){ const v=V95(); const L=v.mdjL[cat]; const prev=new Set(L?L.ids:[]);
+  const all=MDJ_IDS[cat].filter(id=>inSeason(id)); const sc=id=>mdjAdj(id)+rnd()*1.2+(DISH[id].gen?-0.4:0);
+  let good=all.filter(id=>!prev.has(id)&&v95Feas(id,10)); let ok=all.filter(id=>!prev.has(id)&&!good.includes(id)&&v95Feas(id,1));
+  good.sort((a,b)=>sc(b)-sc(a)); ok.sort((a,b)=>sc(b)-sc(a));
+  /* variété : max 4 combinaisons générées par liste */
+  const out=[]; let g=0; for(const id of good.concat(ok)){ if(out.length>=10) break; if(DISH[id].gen){ if(g>=4) continue; g++; } out.push(id); }
+  for(const id of good.concat(ok)) { if(out.length>=10) break; if(!out.includes(id)) out.push(id); }
+  if(out.length<10) for(const id of all.sort((a,b)=>sc(b)-sc(a))){ if(out.length>=10) break; if(!out.includes(id)) out.push(id); }
+  v.mdjL[cat]={ids:out,used:[],n:(L?L.n:0)+1,d:dayNum()}; return v.mdjL[cat]; }
+function v95List(cat){ const v=V95(); v.mdjL=v.mdjL||{}; let L=v.mdjL[cat]; if(!L||!L.ids||!L.ids.length) L=v95NewList(cat);
+  L.ids=L.ids.filter(id=>DISH[id]); if(L.used.filter(id=>L.ids.includes(id)).length>=L.ids.length) L=v95NewList(cat); return L; }
+function v95MarkUsed(){ if(!S.mdj) return; for(const cat in V95CAT){ const id=S.mdj[V95CAT[cat]]; if(!id) continue; const L=v95List(cat); if(L.ids.includes(id)&&!L.used.includes(id)) L.used.push(id); } }
+{ const _g=mdjGen; mdjGen=function(){ const sv={}; try{ for(const cat in V95CAT){ const L=v95List(cat); const rest=L.ids.filter(id=>!L.used.includes(id)); const feas=rest.filter(id=>v95Feas(id,1)); sv[cat]=MDJ_IDS[cat].slice(); const nx=V95().next, pl=nx&&nx.d===dayNum()?nx[V95CAT[cat]]:null; const use=(pl&&L.ids.includes(pl)&&v95Feas(pl,10))?[pl]:(feas.length?feas:rest.length?rest:L.ids); MDJ_IDS[cat].length=0; MDJ_IDS[cat].push(...use); } }catch(e){ console.error(e); }
+    try{ _g(); } finally { for(const cat in sv){ MDJ_IDS[cat].length=0; MDJ_IDS[cat].push(...sv[cat]); } }
+    try{ v95MarkUsed(); for(const cat in V95CAT){ const L=v95List(cat); if(L.used.length>=L.ids.length){ /* la prochaine génération démarre une nouvelle liste */ } } }catch(e){ console.error(e); } }; }
+mdjOptIds=function(cat,cur){ const L=v95List(cat); const o=L.ids.slice(); if(cur&&!o.includes(cur)) o.unshift(cur); return o; };
+{ const _s=A_mdjSet; A_mdjSet=function(slot,id){ const r=_s(slot,id); if(r&&r.ok) try{ v95MarkUsed(); }catch(e){} return r; }; }
+{ const _w=mdjWantProb; mdjWantProb=function(g){ const p=_w(g); return v95Adapted()?Math.min(0.95,p*1.12):p; }; }
+{ const _pr=postReview; postReview=function(stars,text,g){ try{ if(g&&g.items&&v95Adapted()&&g.items.some(x=>x&&x.id&&DISH[x.id]&&DISH[x.id].mdjd)&&stars<5&&rnd()<0.3) stars=stars+1; }catch(e){} return _pr(stars,text,g); }; }
+function v95MdjCard(){ if(!mdjOpen()) return ''; const k=v95WxKind(), w=weatherOf(dayNum()); const ad=v95Adapted();
+  const row=cat=>{ const L=v95List(cat), cur=S.mdj[V95CAT[cat]];
+    return '<div class="v95l"><b>'+CATS[cat]+'s · liste n°'+L.n+' · '+L.used.filter(x=>L.ids.includes(x)).length+'/'+L.ids.length+' servies</b><div class="chips">'+L.ids.map(id=>{ const f=v95Fit(id), u=L.used.includes(id), n=mdjMaxN([id]);
+      return '<span class="chip'+(id===cur?' ok':u?'':f.ok?'':'')+'" style="'+(u&&id!==cur?'opacity:.55;text-decoration:line-through':'')+'">'+DISH[id].e+' '+DISH[id].n+(id===cur?' · ⭐ aujourd’hui':'')+(f.wx>0?' 🌡️':'')+(f.sea?' 🍂':'')+(f.loc?' 📍':'')+(!u&&n<1?' · ⚠️ stock':'')+'</span>'; }).join('')+'</div></div>'; };
+  return card('👨‍🍳 Les 10 propositions du chef','<p class="muted">Chaque jour, le chef choisit une entrée, un plat et un dessert parmi ces listes, uniquement avec les ingrédients <b>déjà en stock</b> (frais ou proches de la date limite). Vous pouvez changer chaque plat avec les menus ci-dessus. Quand les 10 propositions d’une catégorie ont été servies, une nouvelle liste arrive.</p>'+
+    '<p>'+w.e+' '+w.t+'° · '+(k==='hot'?'il fait chaud : le chef privilégie les plats frais':k==='cold'?'temps froid ou pluvieux : plats chauds et réconfortants':'temps doux')+' · '+(ad?'<span class="chip ok">✅ Menu adapté (météo, saison, local) : +12 % de ventes, avis meilleurs</span>':'<span class="chip warn">Menu peu adapté à la météo ou à la saison</span>')+'</p>'+
+    '<small class="muted">🌡️ adapté à la météo · 🍂 de saison · 📍 produit local / terroir (moins cher au marché local)</small>'+row('entree')+row('plat')+row('dessert'),'v95mdj'); }
+{ const _v=viewMDJ; viewMDJ=function(){ let h=_v(); try{ const c=v95MdjCard(); const i=h.indexOf('<section',10); h=i>0?h.slice(0,i)+c+h.slice(i):h+c; }catch(e){ console.error(e); } return h; }; }
+
+/* ===== v9.5 part c ===== */
+/* ---------- 8) 17 GRANDS ÉVÉNEMENTS DU CALENDRIER : 2 menus élaborés (A / B) proposés par le chef ---------- */
+Object.assign(FEST_P,{an:{n:'Menu du Nouvel An',e:'🎉'},mardi:{n:'Menu de Mardi gras',e:'🎭'},mai1:{n:'Menu du 1er mai',e:'🌿'},musique:{n:'Menu de la fête de la musique',e:'🎸'},a15:{n:'Menu du 15 août',e:'☀️'},vend:{n:'Menu des vendanges',e:'🍇'}});
+const V95FEST_ORDER=['an','epiph','chand','valent','mardi','paques','mai1','meres','peres','musique','j14','a15','vend','hallo','beauj','noel','sylv'];
+{ const _fw=festWin; festWin=function(k,y){ const S0=(m,d,yy)=>serOf(yy||y,m,d);
+  switch(k){ case 'an': return [S0(0,1),S0(0,3)]; case 'mardi':{ const E=easterSer(y); return [E-50,E-47]; } case 'mai1': return [S0(4,1)-2,S0(4,1)];
+    case 'musique': return [S0(5,19),S0(5,21)]; case 'a15': return [S0(7,13),S0(7,15)]; case 'vend': return [S0(8,20),S0(8,27)]; }
+  return _fw(k,y); }; }
+// [id, période, variante, cat, emoji, nom, prix, prép., qualité, recette, allergènes]
+const V95FD=[
+ /* compléments du menu A (plats existants + ce qui manquait) */
+ ['meres_e','meres','A','entree','🌷','Velouté d’asperges, chantilly au cerfeuil',11,3,4.1,{legumes:1,creme:1},['lait','celeri']],
+ ['peres_e','peres','A','entree','🍺','Terrine de campagne à la bière',10,2.5,3.9,{jambon:1,biere:1,pain:1},['gluten']],
+ ['j14_e','j14','A','entree','🇫🇷','Tomates-mozzarella tricolores',9,2,3.9,{legumes:1,fromage:1},['lait']],
+ ['hallo_e','hallo','A','entree','🎃','Velouté de potiron, graines torréfiées',9,3,3.9,{legumes:1,creme:1},['lait']],
+ ['epiph_e','epiph','A','entree','🥐','Feuilleté au fromage de la fève',9,3,3.9,{fromage:1,epicerie:1},['gluten','lait','oeufs']],
+ ['epiph_p','epiph','A','plat','👑','Pintade rôtie aux marrons',22,5,4.2,{volaille:1,legumes:1,patate:1},[]],
+ ['chand_e','chand','A','entree','🥞','Galette complète jambon-œuf-fromage',10,3,3.9,{jambon:1,fromage:1,epicerie:1},['gluten','lait','oeufs']],
+ ['chand_p','chand','A','plat','🧀','Galette bretonne aux poireaux et Saint-Jacques',19,4.5,4.2,{poisson:1,legumes:1,epicerie:1},['mollusques','lait','gluten']],
+ ['beauj_d','beauj','A','dessert','🍐','Poire pochée au Beaujolais',8.5,2.5,4,{fruits:1,vin:1},['sulfites']],
+ /* menus B des fêtes existantes */
+ ['noel_bE','noel','B','entree','🦐','Cassolette de Saint-Jacques et crevettes',17,3.5,4.4,{poisson:1,creme:1},['mollusques','crustaces','lait']],
+ ['noel_bP','noel','B','plat','🦌','Chapon rôti, gratin aux cèpes',28,6,4.5,{volaille:2,patate:1,creme:1},['lait']],
+ ['noel_bD','noel','B','dessert','🌰','Bûche glacée marrons-chocolat',10,3,4.3,{chocolat:1,creme:1,epicerie:1},['lait','oeufs','coque']],
+ ['sylv_bE','sylv','B','entree','🦪','Huîtres et pain de seigle',16,2,4.3,{poisson:1,pain:1},['mollusques','gluten']],
+ ['sylv_bP','sylv','B','plat','🦞','Homard thermidor, riz safrané',38,6,4.6,{poisson:2,creme:1,feculents:1},['crustaces','lait']],
+ ['sylv_bD','sylv','B','dessert','🥂','Sabayon au champagne, fruits rouges',10,2.5,4.3,{fruits:1,spirit:1,creme:1},['oeufs','sulfites']],
+ ['valent_bE','valent','B','entree','🌹','Carpaccio de Saint-Jacques aux agrumes',15,2.5,4.3,{poisson:1,fruits:1},['mollusques']],
+ ['valent_bP','valent','B','plat','❤️','Filet de bœuf Rossini',36,6,4.6,{boeuf:2,pain:1,patate:1},['gluten']],
+ ['valent_bD','valent','B','dessert','💕','Cœur framboise-litchi',10,3,4.4,{fruits:1,creme:1,epicerie:1},['gluten','lait','oeufs']],
+ ['paques_bE','paques','B','entree','🌱','Asperges sauce mousseline',12,3,4.1,{legumes:1,creme:1},['oeufs','lait']],
+ ['paques_bP','paques','B','plat','🐏','Navarin d’agneau printanier',23,5.5,4.3,{veau:1,legumes:1,patate:1},['celeri']],
+ ['paques_bD','paques','B','dessert','🍫','Œuf en chocolat surprise, praliné',9,3,4.2,{chocolat:1,creme:1},['lait','coque']],
+ ['meres_bE','meres','B','entree','🥗','Salade de crabe et pamplemousse',13,2.5,4.1,{poisson:1,fruits:1,legumes:1},['crustaces']],
+ ['meres_bP','meres','B','plat','🐟','Filet de bar, beurre blanc',24,5,4.4,{poisson:1,creme:1,patate:1},['poissons','lait']],
+ ['meres_bD','meres','B','dessert','🌹','Pavlova rose et framboises',9.5,3,4.3,{fruits:1,creme:1,epicerie:1},['oeufs','lait']],
+ ['peres_bE','peres','B','entree','🧀','Œufs cocotte au comté',10,2.5,4,{fromage:1,creme:1},['oeufs','lait']],
+ ['peres_bP','peres','B','plat','🥩','Entrecôte maître d’hôtel, frites maison',27,5,4.4,{boeuf:2,patate:2},['lait']],
+ ['peres_bD','peres','B','dessert','🥃','Baba au rhum',9,2.5,4.1,{epicerie:1,spirit:1,creme:1},['gluten','lait','oeufs']],
+ ['j14_bE','j14','B','entree','🥒','Gaspacho bleu-blanc-rouge',8.5,2,3.9,{legumes:2,creme:1},['lait']],
+ ['j14_bP','j14','B','plat','🍗','Poulet rôti du dimanche, pommes sautées',19,5,4.1,{volaille:2,patate:1},[]],
+ ['j14_bD','j14','B','dessert','🎆','Vacherin glacé fraise-vanille',9,2.5,4.1,{fruits:1,creme:1,epicerie:1},['lait','oeufs']],
+ ['hallo_bE','hallo','B','entree','🦇','Soupe de sorcière (potiron-châtaigne)',8.5,3,3.9,{legumes:1,creme:1},['lait','coque']],
+ ['hallo_bP','hallo','B','plat','🧛','Joue de bœuf au vin « sang de dragon »',21,6,4.2,{paleron:1,vin:1,patate:1},['sulfites']],
+ ['hallo_bD','hallo','B','dessert','🕸️','Tarte potiron-cannelle toile d’araignée',8,3,4,{legumes:1,epicerie:1,creme:1},['gluten','lait','oeufs']],
+ ['epiph_bE','epiph','B','entree','🍄','Velouté de cèpes',10,3,4,{legumes:1,creme:1},['lait']],
+ ['epiph_bP','epiph','B','plat','🦆','Magret aux pommes caramélisées',23,5,4.3,{volaille:1,pomme:1,patate:1},[]],
+ ['epiph_bD','epiph','B','dessert','🍊','Gâteau des rois provençal (brioche aux fruits confits)',8,2,4,{epicerie:1,fruits:1,creme:1},['gluten','lait','oeufs']],
+ ['chand_bE','chand','B','entree','🥬','Crêpe roulée saumon-chèvre',10,2.5,4,{poisson:1,fromage:1,epicerie:1},['poissons','lait','gluten','oeufs']],
+ ['chand_bP','chand','B','plat','🥓','Galette savoyarde (reblochon, lardons)',16,4,4.1,{jambon:1,fromage:1,patate:1,epicerie:1},['lait','gluten']],
+ ['chand_bD','chand','B','dessert','🍯','Crêpes Suzette flambées',8.5,3,4.2,{epicerie:1,fruits:1,spirit:1},['gluten','lait','oeufs']],
+ ['beauj_bE','beauj','B','entree','🥖','Salade lyonnaise au lard',10,2.5,4,{legumes:1,jambon:1,pain:1},['oeufs','gluten']],
+ ['beauj_bP','beauj','B','plat','🍖','Andouillette AAAAA, sauce moutarde',18,4.5,4.1,{jambon:2,patate:1,creme:1},['moutarde','lait']],
+ ['beauj_bD','beauj','B','dessert','🍮','Tarte aux pralines roses',8,2.5,4,{epicerie:1,creme:1},['gluten','lait','oeufs','coque']],
+ /* nouveaux événements : A et B */
+ ['an_aE','an','A','entree','🥂','Foie gras mi-cuit, chutney de figues',17,3,4.4,{volaille:1,fruits:1,pain:1},['gluten']],
+ ['an_aP','an','A','plat','🦃','Suprême de chapon, purée truffée',29,6,4.5,{volaille:2,patate:1,creme:1},['lait']],
+ ['an_aD','an','A','dessert','🎆','Entremets trois chocolats',10,3,4.3,{chocolat:1,creme:1,epicerie:1},['gluten','lait','oeufs']],
+ ['an_bE','an','B','entree','🐟','Saumon gravlax, crème aneth',15,2.5,4.2,{poisson:1,creme:1},['poissons','lait']],
+ ['an_bP','an','B','plat','🥩','Tournedos sauce morilles',33,6,4.5,{boeuf:2,creme:1,patate:1},['lait']],
+ ['an_bD','an','B','dessert','🍊','Omelette norvégienne flambée',10,3,4.3,{creme:1,fruits:1,epicerie:1,spirit:1},['oeufs','lait','gluten']],
+ ['mardi_aE','mardi','A','entree','🥨','Bugnes salées au fromage',8,2.5,3.8,{fromage:1,epicerie:1},['gluten','lait','oeufs']],
+ ['mardi_aP','mardi','A','plat','🎭','Tartiflette de carnaval',17,4.5,4,{patate:2,fromage:1,jambon:1},['lait']],
+ ['mardi_aD','mardi','A','dessert','🍩','Beignets et bugnes lyonnaises',7,2.5,4,{epicerie:1,creme:1},['gluten','lait','oeufs']],
+ ['mardi_bE','mardi','B','entree','🧀','Gougères chaudes',8,2.5,3.9,{fromage:1,creme:1,epicerie:1},['gluten','lait','oeufs']],
+ ['mardi_bP','mardi','B','plat','🥘','Potée auvergnate',17,5,4,{jambon:1,legumes:1,patate:1},['celeri']],
+ ['mardi_bD','mardi','B','dessert','🎊','Merveilles et oreillettes',7,2.5,3.9,{epicerie:1,fruits:1},['gluten','oeufs']],
+ ['mai1_aE','mai1','A','entree','🌿','Salade printanière aux herbes',9,2,3.9,{legumes:2,fromage:1},['lait'],],
+ ['mai1_aP','mai1','A','plat','🐑','Épaule d’agneau confite, légumes nouveaux',22,5.5,4.2,{veau:1,legumes:1,patate:1},[]],
+ ['mai1_aD','mai1','A','dessert','🍓','Fraisier du printemps',9,3,4.2,{fruits:1,creme:1,epicerie:1},['gluten','lait','oeufs']],
+ ['mai1_bE','mai1','B','entree','🥚','Œuf parfait, crème d’asperges',10,3,4,{legumes:1,creme:1},['oeufs','lait']],
+ ['mai1_bP','mai1','B','plat','🐟','Truite meunière, pommes vapeur',19,4.5,4.1,{poisson:1,patate:1,creme:1},['poissons','lait']],
+ ['mai1_bD','mai1','B','dessert','🌸','Tarte à la rhubarbe meringuée',8.5,3,4.1,{fruits:1,epicerie:1,creme:1},['gluten','lait','oeufs']],
+ ['musique_aE','musique','A','entree','🎸','Planche apéro (charcuterie, fromages)',12,2,3.9,{jambon:1,fromage:1,pain:1},['gluten','lait']],
+ ['musique_aP','musique','A','plat','🍔','Burger du bistrot, frites maison',17,4,4,{boeuf:1,pain:1,patate:1,fromage:1},['gluten','lait']],
+ ['musique_aD','musique','A','dessert','🍦','Coupe glacée rock’n’roll',7,1.5,3.9,{creme:1,chocolat:1,fruits:1},['lait']],
+ ['musique_bE','musique','B','entree','🌮','Tacos de poulet, guacamole',10,2.5,3.9,{volaille:1,legumes:1,pain:1},['gluten']],
+ ['musique_bP','musique','B','plat','🍢','Brochettes grillées, salade d’été',18,4.5,4,{boeuf:1,volaille:1,legumes:1},[]],
+ ['musique_bD','musique','B','dessert','🍉','Salade de pastèque à la menthe',6.5,1.5,3.8,{fruits:2},[]],
+ ['a15_aE','a15','A','entree','🍅','Gaspacho et tartines à la tapenade',9,2,3.9,{legumes:2,pain:1},['gluten']],
+ ['a15_aP','a15','A','plat','🐟','Loup grillé au fenouil, ratatouille',25,5,4.3,{poisson:1,legumes:2},['poissons']],
+ ['a15_aD','a15','A','dessert','🍑','Pêches melba',8,2,4,{fruits:1,creme:1},['lait']],
+ ['a15_bE','a15','B','entree','🍈','Melon, jambon cru et pesto',10,1.5,3.9,{fruits:1,jambon:1},[]],
+ ['a15_bP','a15','B','plat','🥘','Paella royale de l’été',24,6,4.3,{poisson:1,volaille:1,feculents:1},['crustaces','mollusques']],
+ ['a15_bD','a15','B','dessert','🍧','Sorbet citron et vodka (colonel)',8.5,1.5,4,{fruits:1,spirit:1},[]],
+ ['vend_aE','vend','A','entree','🍇','Œufs en meurette du vigneron',11,3.5,4,{creme:1,vin:1,oignon:1},['oeufs','sulfites']],
+ ['vend_aP','vend','A','plat','🍷','Civet de lièvre (façon chevreuil) au vin',24,6,4.3,{paleron:1,vin:1,feculents:1},['sulfites']],
+ ['vend_aD','vend','A','dessert','🥧','Tarte aux raisins et crème d’amande',8.5,3,4.1,{fruits:1,epicerie:1,creme:1},['gluten','lait','oeufs','coque']],
+ ['vend_bE','vend','B','entree','🧀','Fromage de chèvre chaud au miel',10,2.5,4,{fromage:1,pain:1,legumes:1},['gluten','lait']],
+ ['vend_bP','vend','B','plat','🦆','Confit de canard, pommes sarladaises',23,5,4.3,{volaille:1,patate:2},[]],
+ ['vend_bD','vend','B','dessert','🍐','Clafoutis aux raisins et poires',8,2.5,4,{fruits:1,creme:1,epicerie:1},['gluten','lait','oeufs']]
+];
+for(const [id,per,v,cat,e,n,ref,prep,q,rec,al] of V95FD){ const k='f_'+id; if(DISH[k]) continue; DISH[k]={n,e,cat,ref,prep,q,pop:1.5,rec,al,fest:per,v95v:v,veg:!Object.keys(rec).some(i=>ING[i].meat),gf:!al.includes('gluten')}; }
+for(const k in DISH) if(DISH[k].fest&&!DISH[k].v95v) DISH[k].v95v='A';
+festIds=per=>Object.keys(DISH).filter(k=>DISH[k].fest===per);
+const v95FestV=(per,v)=>festIds(per).filter(k=>DISH[k].v95v===v);
+function v95FestStock(ids,cov){ const need={}; for(const id of ids) for(const i in DISH[id].rec) need[i]=(need[i]||0)+DISH[id].rec[i]*cov; const lack=[]; for(const i in need) if(S.stock[i].q+incoming(i)+0.01<need[i]) lack.push(ING[i].e+' '+ING[i].n); return lack; }
+function v95FestFix(){ const F=FS(); for(const id in F){ const f=F[id]; if(f.v95) continue; f.v95=1; if(f.st==='prop'){ f.v=f.v||'A'; const A=v95FestV(f.k,'A'), B=v95FestV(f.k,'B'); f.sel={}; for(const i of A.concat(B)){ f.sel[i]=A.includes(i); if(f.pr[i]==null) f.pr[i]=Math.round(DISH[i].ref*10)/10; } } } }
+{ const _fd=v7FestDay; v7FestDay=function(){ v95EnsureMenu(); _fd(); try{ v95FestFix(); }catch(e){ console.error(e); } }; }
+function v95FestChoose(id,v){ const f=FS()[id]; if(!f) return; f.v=v; const A=v95FestV(f.k,'A'), B=v95FestV(f.k,'B'); for(const i of A.concat(B)){ f.sel[i]=(v==='A'?A:B).includes(i); if(f.pr[i]==null) f.pr[i]=Math.round(DISH[i].ref*10)/10; } }
+PANELS.fest={t:()=>'🎊 Menu de fête',f(){ const f=FS()[PN.d.id]; if(!f) return '<div class="card"><p>Proposition introuvable.</p></div>'; try{ v95FestFix(); }catch(e){} const {ch}=chefs(); const P=FEST_P[f.k]; const cov=Math.max(20,Math.round(evSeats()*1.2));
+  let h='<div class="card">'+dialogue({e:'👨‍🍳',n:ch?ch.name+' (chef)':'Le chef'},'« Pour <b>'+P.n.toLowerCase()+'</b> ('+dateShort(f.start)+' → '+dateShort(f.end)+'), je vous ai préparé <b>deux menus</b>. Choisissez celui qui vous plaît, puis ajustez les prix si besoin. »')+'</div>';
+  for(const v of ['A','B']){ const ids=v95FestV(f.k,v); if(!ids.length) continue; const tot=ids.reduce((a,i)=>a+(f.pr[i]||DISH[i].ref),0), cost=ids.reduce((a,i)=>a+festCost(i),0); const lack=v95FestStock(ids,cov); const on=f.v===v;
+    h+='<div class="card'+(on?' cardok':'')+'"><h3>'+P.e+' Proposition '+v+(on?' · ✔ choisie':'')+'</h3>'+['entree','plat','dessert'].map(c=>ids.filter(i=>DISH[i].cat===c).map(i=>'<p style="margin:4px 0"><small>'+CATS[c]+'</small><br>'+DISH[i].e+' <b>'+DISH[i].n+'</b> · '+fm(f.pr[i]||DISH[i].ref)+'</p>').join('')).join('')+
+      '<p class="muted">Menu complet ≈ <b>'+fm(tot)+'</b> · coût matière ≈ '+fm(cost)+'<br>'+(lack.length?'⚠️ Stock à prévoir pour ~'+cov+' couverts : '+lack.slice(0,5).join(', ')+' (commande automatique prévue)':'✅ Stock suffisant pour ~'+cov+' couverts')+'</p>'+(on?'':btn('Choisir la proposition '+v,'v95fv',f.id+'|'+v,null,'primary'))+'</div>'; }
+  const ids=v95FestV(f.k,f.v||'A');
+  h+='<div class="card"><h3>Prix et plats retenus · proposition '+(f.v||'A')+'</h3>'+ids.map(i=>{ const d=DISH[i], pr=f.pr[i]; return '<div class="row" style="padding:8px 0;border-top:1px solid var(--line)"><div style="display:flex;gap:6px;align-items:center"><span style="flex:1">'+d.e+' <b>'+d.n+'</b><br><small>🧾 '+ingList(i)+' · coût ≈ '+fm(festCost(i))+'</small></span>'+btn('−','festpr',f.id+'|'+i+'|-0.5',null,'ghost sm')+'<b>'+fm(pr)+'</b>'+btn('+','festpr',f.id+'|'+i+'|0.5',null,'ghost sm')+btn(f.sel[i]?'✔':'✖','festsel',f.id+'|'+i,null,f.sel[i]?'primary sm':'ghost sm')+'</div></div>'; }).join('')+'</div>';
+  return h+'<div class="btnrow">'+btn('Valider le menu '+(f.v||'A')+' ✔','festok',f.id,null,'primary')+btn('Refuser','festno',f.id,null,'ghost')+'</div>'; }};
+ACT.v95fv=function(p){ const [id,v]=String(p).split('|'); v95FestChoose(id,v); panelRender(true); };
+function v95EnsureMenu(){ if(!S||!S.menu) return; for(const id in DISH) if(!S.menu[id]) S.menu[id]={on:false,price:DISH[id].ref}; }
+
+/* ---------- 9) GROUPES > 10 : privatisation des tables sur le plan + personnel dédié + intérim ---------- */
+function v95EvPlan(e){ const C=compilePlan(S.plan); let x0=1e9,y0=1e9,x1=0,y1=0; for(const t of C.tabs){ x0=Math.min(x0,t.x); y0=Math.min(y0,t.y); x1=Math.max(x1,t.x+t.cw); y1=Math.max(y1,t.y+t.ch); } if(!C.tabs.length){ x0=y0=0; x1=S.plan.W; y1=S.plan.H; } x0=Math.max(0,x0-1); y0=Math.max(0,y0-1); x1+=1; y1+=1; const W=x1-x0, H=y1-y0; e.sel=e.sel||[]; const capSel=e.sel.reduce((a,j)=>a+(S.tabs[j]?S.tabs[j].cap:0),0);
+  let h='<div class="card"><h3>🔒 Privatiser des tables · '+e.n+' convives</h3><p class="muted">Touchez les tables à réserver au groupe : elles seront bloquées pour les autres clients à partir de 1 h 30 avant l’arrivée.</p>'+
+   '<div id="v95mp" style="position:relative;width:100%;max-width:'+Math.min(560,Math.round(260*W/H))+'px;margin:6px auto;aspect-ratio:'+W+'/'+H+';background:#e9d8bf;border-radius:10px;border:2px solid #8a5a3c">';
+  C.tabs.forEach((t,j)=>{ const on=e.sel.includes(j); h+='<button class="btn sm '+(on?'primary':'ghost')+'" data-a="v95tab" data-p="'+e.id+'|'+j+'" aria-label="Table '+(j+1)+'" style="position:absolute;left:'+((t.x-x0)/W*100)+'%;top:'+((t.y-y0)/H*100)+'%;width:'+(t.cw/W*100-0.6)+'%;height:'+(t.ch/H*100-0.6)+'%;min-width:0;min-height:0;padding:0;margin:0;font-size:11px;line-height:1">'+(j+1)+'<br>'+t.cap+'p</button>'; });
+  const nd=e.n<=15?2:3;
+  h+='</div><p>'+(capSel>=e.n?'✅':'⚠️')+' <b>'+capSel+'</b> places sélectionnées pour <b>'+e.n+'</b> convives'+(capSel<e.n?' · il manque '+(e.n-capSel)+' places (complétées automatiquement le jour J si possible)':'')+'</p>'+
+   '<p class="muted">👥 Service dédié : <b>'+nd+' serveurs</b> réservés au groupe ('+(e.n<=15?'jusqu’à 15 couverts':'plus de 15 couverts')+'), remplacés en salle par '+nd+' intérimaires appelés automatiquement.</p>'+
+   '<div class="btnrow">'+btn('Sélection automatique','v95tabauto',e.id,null,'ghost sm')+btn('Tout désélectionner','v95tabclr',e.id,null,'ghost sm')+'</div></div>';
+  return h; }
+{ const _pe=PANELS.evt.f; PANELS.evt.f=function(){ let h=_pe.apply(this,arguments); try{ const e=EV().find(x=>x.id===(+PN.d.id||0)); if(e&&e.n>10&&['menu','neg','counter','booked'].includes(e.st)){ const c=v95EvPlan(e); h=h.replace('des tables sont réservées à partir de 1 h avant','les tables choisies ci-dessous sont bloquées dès 1 h 30 avant'); const i=h.lastIndexOf('<div class="btnrow">'); h=i>0?h.slice(0,i)+c+h.slice(i):h+c; } }catch(x){ console.error(x); } return h; }; }
+ACT.v95tab=function(p){ const [id,j]=String(p).split('|').map(Number); const e=EV().find(x=>x.id===id); if(!e) return; e.sel=e.sel||[]; const k=e.sel.indexOf(j); if(k>=0) e.sel.splice(k,1); else e.sel.push(j); panelRender(true); };
+ACT.v95tabclr=function(p){ const e=EV().find(x=>x.id===+p); if(e){ e.sel=[]; panelRender(true); } };
+ACT.v95tabauto=function(p){ const e=EV().find(x=>x.id===+p); if(!e) return; e.sel=[]; let cap=0; const L=S.tabs.map((t,j)=>({j,cap:t.cap})).sort((a,b)=>b.cap-a.cap); for(const t of L){ if(cap>=e.n) break; e.sel.push(t.j); cap+=t.cap; } panelRender(true); };
+{ const _eh=evHold; evHold=function(e){ if(!(e.sel&&e.sel.length)) return _eh(e); e.tabs=e.tabs||[]; const tok='EVT'+e.id;
+    for(const j of e.sel){ const t=S.tabs[j]; if(!t||e.tabs.includes(j)) continue; if(t.g==null&&(t.hold==null||t.hold===tok)){ t.hold=tok; e.tabs.push(j); } }
+    e.cap=e.tabs.reduce((a,j)=>a+S.tabs[j].cap,0); if(minOfDay()>=e.a&&e.cap<e.n) _eh(e); }; }
+function v95EvStaff(e){ if(e.v95st) return; e.v95st=1; const nd=e.n<=15?2:3;
+  const W=S.staff.filter(s=>s.role==='waiter'&&!s.v95ded&&working(s)).sort((a,b)=>(b.skill||0)-(a.skill||0)); const ded=W.slice(0,nd); for(const s of ded) s.v95ded=e.id;
+  let dep=0; try{ v9VivEnsure(); const d=dayNum(); const busy=new Set(S.staff.filter(s=>s.tmp&&s.v9dep&&s.tmpDay===d&&s.v9vid).map(s=>s.v9vid)); const pool=((S.vivier&&S.vivier.serv)||[]).slice().sort((a,b)=>(b.note||0)-(a.note||0));
+    for(const c of pool){ if(dep>=ded.length) break; if(busy.has(c.id)) continue; const st=v9VivDeployOne(c,'serv',false); if(st){ st.v95int=e.id; dep++; } } }catch(x){ console.error(x); }
+  while(dep<ded.length){ try{ const P=POSTS.serv, d=dayNum(), wage=Math.round(fairPost('serv',5)*1.3); const st=mkStaff({id:nid(),role:P.role,post:'serv',name:'Intérimaire',skill:5,wage,mor:70,ct:{k:'interim',from:d,end:d},tmp:true,tmpDay:d,tmpG:'serv',sk:{},lv:newLv(),shift:e.svc==='midi'?'A':'C',off:false,team:0}); st.v95int=e.id; S.staff.push(st); S.day.interim=(S.day.interim||0)+1; dep++; }catch(x){ console.error(x); break; } }
+  e.v95ded=ded.map(s=>s.name); e.v95int=dep;
+  note('👥 '+e.name+' : '+(ded.length?ded.map(s=>s.name).join(', ')+' dédié'+(ded.length>1?'s':'')+' au groupe':'aucun serveur disponible pour le groupe')+(dep?' · '+dep+' intérimaire'+(dep>1?'s':'')+' en renfort en salle':'')+'.','info'); }
+{ const _et=v7EvtTick; v7EvtTick=function(){ try{ const d=dayNum(), m=minOfDay(); for(const e of EV()){ if(e.st==='booked'&&e.day===d&&!e.done){ if(e.sel&&e.sel.length&&m>=e.a-90&&m<e.a-60) evHold(e); if(e.n>10&&m>=e.a-30&&m<e.b) v95EvStaff(e); } } }catch(x){ console.error(x); } _et(); }; }
+{ const _ef=evFinish; evFinish=function(e){ for(const s of S.staff) if(s.v95ded===e.id) s.v95ded=0; return _ef(e); }; }
+avail = s=>!s.v95ded&&working(s)&&inWin(segOf(s),minOfDay());
+function v95DedClean(){ const live=new Set(EV().filter(e=>e.st==='booked'&&!e.done).map(e=>e.id)); for(const s of S.staff) if(s.v95ded&&!live.has(s.v95ded)) s.v95ded=0; }
+
+/* ---------- 10) ÉDITEUR « Événements » : déco gratuite + nappes thématiques ---------- */
+const V95DECO={N:['an','🎉','Guirlande du Nouvel An'],G:['epiph','👑','Couronnes des rois'],H:['chand','🥞','Déco Chandeleur'],I:['valent','💘','Cœurs de la Saint-Valentin'],J:['mardi','🎭','Masques de Mardi gras'],O:['paques','🐣','Œufs de Pâques'],U:['mai1','🌿','Brins de muguet'],M:['meres','💐','Bouquet fête des mères'],Y:['peres','🎩','Déco fête des pères'],X:['musique','🎸','Instruments fête de la musique'],Z:['j14','🇫🇷','Fanions du 14 juillet'],A:['a15','🏖️','Déco estivale du 15 août'],v:['vend','🍇','Tonneau des vendanges'],h:['hallo','🎃','Citrouille d’Halloween'],b:['beauj','🍷','Déco Beaujolais nouveau'],n:['noel','🎄','Sapin de Noël'],y:['sylv','🥂','Déco du réveillon']};
+const V95NAP={an:['#1f2547','#d8b44a','Nuit étoilée'],epiph:['#f4e3b0','#c9952c','Dorée'],chand:['#f7ead2','#e0a03a','Crêpe'],valent:['#f7d6dc','#c8203a','Cœurs rouges'],mardi:['#efe0f5','#8a3fb0','Arlequin'],paques:['#e6f4dc','#f0c84a','Printemps'],mai1:['#eef7ea','#5aa04a','Muguet'],meres:['#fbe3ea','#e2709a','Rose'],peres:['#e2e8f0','#2f4b7c','Marine'],musique:['#fff3c4','#e4572e','Festival'],j14:['#ffffff','#1f4fa3','Tricolore'],a15:['#e3f4fb','#2a9fd6','Bord de mer'],vend:['#f1e6f0','#6b2a5c','Vigne'],hallo:['#2b2233','#f08a24','Halloween'],beauj:['#f5e1e1','#8a1e2e','Bordeaux'],noel:['#f3efe6','#b8232f','Noël'],sylv:['#1c1c22','#d8b44a','Paillettes']};
+for(const ch in V95DECO){ const [k,e,n]=V95DECO[ch]; PITEM[ch]={n,e,cat:'ev',cost:0,amb:0.3,v95ev:k}; }
+PITEM.n_0={n:'Nappe classique',e:'🍽️',cat:'ev',cost:0,nappe:''};
+for(const k of V95FEST_ORDER){ const P=FEST_P[k]; PITEM['n_'+k]={n:'Nappe '+V95NAP[k][2].toLowerCase()+' ('+P.n.replace(/^Menu (du |de la |de l’|des |de )?/,'')+')',e:P.e,cat:'ev',cost:0,nappe:k}; }
+let V95EVC={d:-1,s:{}};
+function v95EvOn(k){ const d=dayNum(); if(V95EVC.d!==d){ V95EVC={d,s:{}}; const sr=serD(d), y=ymdS(sr).y; for(const kk in FEST_P){ if(kk==='vac') continue; for(const yy of [y-1,y]){ const w=festWin(kk,yy); if(w&&sr>=w[0]&&sr<=w[1]) V95EVC.s[kk]=1; } } } return !!V95EVC.s[k]; }
+{ const _di=drawItem; drawItem=function(c,ch,x,y,env){ const st=V95ST[ch], dc=V95DECO[ch]; if(!st&&!dc) return _di(c,ch,x,y,env);
+    const X=PAD+x*CELL, Y=PAD+y*CELL; c.save(); c.fillStyle='rgba(40,20,10,.2)'; rr(c,X+1.6,Y+2.8,CELL-2,CELL-2,3); c.fill();
+    c.fillStyle=st?st.col:'#fff6e6'; rr(c,X+1,Y+1,CELL-2,CELL-2,3); c.fill(); c.strokeStyle=st?'#6f8aa3':'#c9a36a'; c.lineWidth=.8; rr(c,X+1,Y+1,CELL-2,CELL-2,3); c.stroke();
+    c.font=Math.round(CELL*0.62)+'px sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(st?st.e:dc[1],X+CELL/2,Y+CELL/2+1); c.restore(); }; }
+{ const _ii=itemIcon; itemIcon=function(k){ const it=PITEM[k]; if(!it||it.nappe==null) return _ii(k); if(ICOC[k]) return ICOC[k]; let url='';
+    try{ const cv=document.createElement('canvas'); cv.width=cv.height=44; const c=cv.getContext('2d'); const N=V95NAP[it.nappe]; c.fillStyle=N?N[0]:'#fcf9f3'; rr(c,4,8,36,28,4); c.fill();
+      if(N){ c.fillStyle=N[1]; for(let i=-28;i<44;i+=8){ c.save(); rr(c,4,8,36,28,4); c.clip(); c.beginPath(); c.moveTo(i,36); c.lineTo(i+3,36); c.lineTo(i+31,8); c.lineTo(i+28,8); c.fill(); c.restore(); } }
+      c.strokeStyle='#8a5a3c'; c.lineWidth=1.2; rr(c,4,8,36,28,4); c.stroke(); c.font='16px sans-serif'; c.textAlign='center'; c.textBaseline='middle'; c.fillText(it.e,22,22); url=cv.toDataURL(); }catch(e){} ICOC[k]=url; return url; }; }
+{ const _tt=tableTop; tableTop=function(c,x,y,w,h,bridge){ const k=S&&S.v95&&S.v95.nappe, N=k&&V95NAP[k]; if(!N) return _tt(c,x,y,w,h,bridge);
+    c.fillStyle=N[0]; rr(c,x,y,w,h,3.4); c.fill(); c.save(); rr(c,x,y,w,h,3.4); c.clip(); c.fillStyle=N[1]; c.globalAlpha=.55;
+    for(let i=-h;i<w;i+=6){ c.beginPath(); c.moveTo(x+i,y+h); c.lineTo(x+i+2.2,y+h); c.lineTo(x+i+2.2+h,y); c.lineTo(x+i+h,y); c.fill(); }
+    c.globalAlpha=1; const eg=c.createLinearGradient(x,y,x,y+h); eg.addColorStop(0,'rgba(255,255,255,.3)'); eg.addColorStop(.5,'rgba(255,255,255,0)'); eg.addColorStop(1,'rgba(60,40,20,.2)'); c.fillStyle=eg; c.fillRect(x,y,w,h); c.restore();
+    c.strokeStyle=N[1]; c.lineWidth=.8; rr(c,x,y,w,h,3.4); c.stroke(); }; }
+{ const _bk=bgKeyNow; bgKeyNow=function(){ return _bk()+'|n'+((S&&S.v95&&S.v95.nappe)||''); }; }
+{ const _ea=edAct; edAct=function(a,v){ if(a==='tool'&&PITEM[v]&&PITEM[v].nappe!=null){ V95().nappe=PITEM[v].nappe; ICOC[v]=ICOC[v]; SC.bgKey=null; toast(PITEM[v].nappe?'🧺 '+PITEM[v].n+' posée sur toutes les tables (gratuit).':'🍽️ Nappes classiques remises.','good'); try{ save(); }catch(e){} edRender(); return; } return _ea(a,v); }; }
+{ const _er=edRender; edRender=function(){ const r=_er.apply(this,arguments); try{ if(ED.open&&ED.cat==='ev'){ const cur=(S.v95&&S.v95.nappe)||''; document.querySelectorAll('[data-ed="tool"]').forEach(b=>{ const it=PITEM[b.dataset.v]; if(it&&it.nappe!=null) b.classList.toggle('on',it.nappe===cur); }); } }catch(e){} return r; }; }
+function v95DecoAmb(){ const C=compilePlan(S.plan); let a=0; for(const ch in V95DECO){ const n=C.cnt[ch]||0; if(n) a+=n*(v95EvOn(V95DECO[ch][0])?0.6:0.15); } const k=S.v95&&S.v95.nappe; if(k&&v95EvOn(k)) a+=0.8; return a; }
+planAmb=function(){ const C=compilePlan(S.plan); let a=0; for(const k of ['p','l','a','j']) a+=(C.cnt[k]||0)*PITEM[k].amb; return Math.min(9,a+v95DecoAmb()); };
+function v95DecoMatch(){ const C=compilePlan(S.plan); for(const ch in V95DECO) if((C.cnt[ch]||0)&&v95EvOn(V95DECO[ch][0])) return true; const k=S.v95&&S.v95.nappe; return !!(k&&v95EvOn(k)); }
+{ const _pr=postReview; postReview=function(stars,text,g){ try{ if(stars<5&&!(g&&g.name&&/^Famille /.test(g.name))&&v95DecoMatch()&&Math.random()<0.15) stars+=1; }catch(e){} return _pr(stars,text,g); }; }
+
+/* ---------- 11) Carte Stocks v9.5 : marge, stockage, courses, voisins ---------- */
+function v95StockCard(){ const v=V95(), n=v95StoreCnt(), cap=v95StoreCap();
+  let h='<section class="card"><h3>🛡️ Zéro rupture</h3><p><b>Marge de sécurité : <span id="v95margl">'+v.marg+' %</span></b><br><input type="range" id="v95marg" min="0" max="50" step="5" value="'+v.marg+'" style="width:100%" aria-label="Marge de sécurité"></p><p class="muted">Les commandes automatiques visent la prévision du jour (réservations + météo) majorée de cette marge.</p>';
+  h+='<h4 style="margin:10px 0 4px">🧊 Stockage</h4><p>'+Object.keys(V95ST).map(k=>V95ST[k].e+' '+V95ST[k].n+' × <b>'+n[k]+'</b>').join('<br>')+'<br>Capacité supplémentaire : <b>+'+cap+'</b> unités'+(cap?'':' · <small>ajoutez des meubles dans l’éditeur (Travaux → Stockage)</small>')+'</p>';
+  h+='<h4 style="margin:10px 0 4px">🛒 Faire les courses</h4>';
+  for(const k of ['mar','gro','exp']){ const C=V95CRS[k]; const cart=v95CrsCart(k), nb=Object.keys(cart).length, cost=v95CrsCost(k,cart);
+    h+='<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)"><span style="flex:1">'+C.e+' <b>'+C.n+'</b><br><small>'+C.d+'<br>'+(nb?nb+' produit(s) · ≈ '+money(cost):'Rien à acheter pour l’instant')+'</small></span>'+btn('Y aller','v95crs',k,null,'primary sm',!nb)+'</div>'; }
+  h+='<h4 style="margin:10px 0 4px">🤝 Dépannage entre voisins</h4><p>'+btn(v.bor?'✔ Activé':'✖ Désactivé','v95bor','',null,v.bor?'primary sm':'ghost sm')+' <small>En cas de manque imminent, le chef emprunte chez les voisins (rendu ×1,1), sinon commande en express.</small></p>';
+  const L=v.borL.slice(-4).reverse(); if(L.length) h+='<p class="muted">'+L.map(b=>'J'+b.d+' · '+ING[b.i].e+' '+b.q+' '+ING[b.i].n+' chez '+b.who).join('<br>')+'</p>';
+  return h+'</section>'; }
+{ const _vs=viewStock; viewStock=function(){ let c=''; try{ c=v95StockCard(); }catch(e){ console.error(e); } return c+_vs(); }; VIEWS.stock=viewStock; }
+ACT.v95crs=function(k){ const r=v95Crs(k); toast(r.msg,r.ok?'good':'bad'); if(r.ok) save(); renderTab(true); updateHeader(); };
+ACT.v95bor=function(){ const v=V95(); v.bor=v.bor?0:1; save(); renderTab(true); };
+document.addEventListener('input',e=>{ const el=e.target; if(el&&el.id==='v95marg'&&S){ V95().marg=clamp(+el.value,0,50); const o=document.getElementById('v95margl'); if(o) o.textContent=V95().marg+' %'; } });
+document.addEventListener('change',e=>{ const el=e.target; if(el&&el.id==='v95marg'&&S){ V95().marg=clamp(+el.value,0,50); try{ save(); }catch(x){} } });
+
+/* ---------- 12) Migration des sauvegardes ---------- */
+let V95LAST=null;
+function v95Migrate(){ if(!S||S===V95LAST) return; V95LAST=S; try{ V95(); v95EnsureMenu(); v95FestFix(); v95DedClean(); SC.bgKey=null; }catch(e){ console.error('v95 migr',e); } }
+setTimeout(v95Migrate,950); setInterval(v95Migrate,1500);
+{ const _ac=autoCheck; autoCheck=function(){ if(S!==V95LAST) v95Migrate(); return _ac.apply(this,arguments); }; }
+
+/* ---------- 13) Menu du jour : le chef prévoit le menu du lendemain et commande pour ses 3 plats ---------- */
+function v95PlanNext(){ const v=V95(), d=dayNum()+1; if(v.next&&v.next.d===d&&['ent','plat','dess'].every(k=>v.next[k]&&DISH[v.next[k]])) return v.next; const o={d}; const pk=[];
+  for(const cat of ['plat','entree','dessert']){ const L=v95List(cat); let pool=L.ids.filter(id=>!L.used.includes(id)&&DISH[id]); if(!pool.length) pool=L.ids.filter(id=>DISH[id]);
+    let best=null,bs=-1e9; for(const id of pool){ let s=0; try{ s=mdjAdj(id); }catch(e){} s+=(v95Feas(id,20)?1.2:0)+rnd()*0.6; if(s>bs){ bs=s; best=id; } } o[V95CAT[cat]]=best; }
+  v.next=o; return o; }
+{ const _mm=mdjMissing; mdjMissing=function(){ const o=_mm(); try{ if(dayNum()>=OPEN_DAY&&S.v95){ const n=v95PlanNext(); for(const k of ['ent','plat','dess']){ const id=n[k]; if(!id||!DISH[id]) continue; const r=DISH[id].rec; for(const i in r){ const want=Math.ceil(r[i]*(MDJ_CAP+10)*1.35); o[i]=(o[i]||0)+want; } } } }catch(e){ console.error(e); } return o; }; }
+function v95MdjFill(){ const m=S.mdj; if(!m||!m.on||m.day!==dayNum()||!mdjOpen()) return; let did=0;
+  for(const [cat,slot] of [['entree','ent'],['dessert','dess'],['plat','plat']]){ if(m[slot]) continue; const L=v95List(cat); const c=L.ids.filter(id=>DISH[id]&&!L.used.includes(id)).concat(L.ids.filter(id=>DISH[id]&&L.used.includes(id)));
+    for(const id of c){ if(mdjMaxN([id])<10) continue; m[slot]=id; mdjReserve(slot); if(m.res[slot]>0){ did++; if(!L.used.includes(id)) L.used.push(id); break; } m[slot]=null; } }
+  if(did){ mdjRecap(); try{ mdjMark(); }catch(e){} note('⭐ Menu du jour complété grâce au stock reçu ('+['ent','plat','dess'].filter(k=>m[k]).map(k=>DISH[m[k]].n).join(' · ')+').','good'); } }
+{ const _ac2=autoCheck; let lastF=-1; autoCheck=function(){ const r=_ac2.apply(this,arguments); try{ const t=Math.floor(S.t/10); if(t!==lastF){ lastF=t; v95MdjFill(); } }catch(e){ console.error(e); } return r; }; }
+
+/* correctif : un événement du soir se termine à 23h mais la journée ferme à 22h30 → on le clôture avant la fermeture (il n'est plus annulé) */
+{ const _ed=endDay; endDay=function(){ try{ const d=dayNum(); for(const e of EV()) if(e.st==='booked'&&e.day===d&&!e.done){ if(!e.started){ e.started=true; } evFinish(e); } }catch(x){ console.error(x); } return _ed.apply(this,arguments); }; }
 
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
