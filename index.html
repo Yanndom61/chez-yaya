@@ -7754,6 +7754,42 @@ function v95MdjFill(){ const m=S.mdj; if(!m||!m.on||m.day!==dayNum()||!mdjOpen()
 /* correctif : un événement du soir se termine à 23h mais la journée ferme à 22h30 → on le clôture avant la fermeture (il n'est plus annulé) */
 { const _ed=endDay; endDay=function(){ try{ const d=dayNum(); for(const e of EV()) if(e.st==='booked'&&e.day===d&&!e.done){ if(!e.started){ e.started=true; } evFinish(e); } }catch(x){ console.error(x); } return _ed.apply(this,arguments); }; }
 
+/* ===== v9.5 part d ===== */
+/* =====================================================================
+   V9.5d · Perfectionnement pendant les travaux : +1 niveau ET +1 dans
+   chaque compétence (spd/qual/ami/aut), bilan visible à la réouverture,
+   historique dans la fiche, rattrapage des travaux passés.
+   ===================================================================== */
+function v95PerfApply(s,d,tag){ const cap=(S.mich&&S.mich.star)?Math.max(TRAIN_MAX,10):TRAIN_MAX; s.lv=s.lv||{};
+  const g=[]; for(const k in TRAIN){ const a=s.lv[k]||0, b=Math.min(cap,a+1); if(b>a){ s.lv[k]=b; g.push([k,a,b]); } }
+  (s.v95perf=s.v95perf||[]).push({d,g,tag:tag||''}); return g; }
+{ const _ds=v6DayStart; v6DayStart=function(){
+    let ready=[]; try{ const t0=(dayNum()-1)*1440+DAYSTART; ready=S.staff.filter(s=>s.trn&&s.trn.v8&&s.trn.until<=t0+1).map(s=>({s,sk:s.skill})); }catch(e){}
+    const r=_ds.apply(this,arguments);
+    try{ if(ready.length){ const d=dayNum(), rows=[];
+        for(const o of ready){ const s=o.s; if(s.trn) continue; const g=v95PerfApply(s,d,'travaux'); if(s.v95perf.length) s.v95perf[s.v95perf.length-1].sk=[o.sk,s.skill]; rows.push({s,sk:[o.sk,s.skill],g}); }
+        if(rows.length){ save(); setTimeout(()=>v95PerfPopup(rows,'🎓 Bilan du perfectionnement','Pendant les travaux, votre équipe s’est perfectionnée. Voici les points gagnés :'),1200); } } }catch(e){ console.error(e); }
+    return r; }; }
+function v95PerfRowsHtml(rows){ return '<ul class="tips" style="text-align:left">'+rows.map(o=>'<li><b>'+o.s.name+'</b> : '
+    +(o.sk&&o.sk[1]>o.sk[0]?'niveau '+o.sk[0]+' → <b>'+o.sk[1]+'</b>, ':'')
+    +(o.g.length?o.g.map(x=>TRAIN[x[0]].e+' '+TRAIN[x[0]].n+' '+x[1]+' → <b>'+x[2]+'</b>').join(', '):'compétences déjà au maximum')+'</li>').join('')+'</ul>'; }
+function v95PerfPopup(rows,title,intro){ try{ showPopup({icon:'🎓',title,body:'<p>'+intro+'</p>'+v95PerfRowsHtml(rows)+'<p class="muted">Retrouvez ce détail dans la fiche de chaque employé.</p>',choices:[{label:'Super !',cb(){}}]}); }catch(e){ console.error(e); } }
+/* rattrapage : travaux passés (extensions + améliorations avec chantier) */
+function v95PerfMigrate(){ if(!S||!S.staff||S.v95perfMig) return; S.v95perfMig=1;
+  let n=0; try{ n+=((S.ext&&S.ext.done)||[]).filter(x=>!x.free&&x.day>0).length; }catch(e){}
+  try{ const on=(S.upg&&S.upg.on)||{}; n+=Object.keys(on).filter(k=>on[k]&&UPGS[k]&&UPGS[k].ph).length; }catch(e){}
+  if(!n) return; const d=dayNum(), rows=[];
+  for(const s of S.staff){ if(s.tmp) continue; let all=[]; for(let i=0;i<n;i++){ const g=v95PerfApply(s,d,'rattrapage'); for(const x of g){ const f=all.find(y=>y[0]===x[0]); if(f) f[2]=x[2]; else all.push(x.slice()); } } if(all.length) rows.push({s,g:all}); }
+  if(rows.length){ note('🎓 Rattrapage : +'+n+' point(s) de compétences rendus à l’équipe (travaux passés).','good'); save(); setTimeout(()=>v95PerfPopup(rows,'🎓 Points de perfectionnement rendus','Lors de vos '+n+' fermeture'+(n>1?'s':'')+' pour travaux, les points de compétences n’avaient pas été ajoutés. C’est corrigé :'),1600); } }
+setTimeout(()=>{ try{ v95PerfMigrate(); }catch(e){ console.error(e); } },1100);
+setInterval(()=>{ try{ if(S&&S.staff&&!S.v95perfMig) v95PerfMigrate(); }catch(e){} },2000);
+/* historique dans la fiche employé */
+{ const _vs=viewStaff; viewStaff=function(){ let h=_vs.apply(this,arguments);
+  try{ const sel=ui.v94emp!=null?S.staff.find(x=>x.id===ui.v94emp):null; if(sel&&sel.v95perf&&sel.v95perf.length){
+      const L=sel.v95perf.slice(-6).reverse().map(p=>'<li>'+(p.tag==='rattrapage'?'Rattrapage travaux passés':'Travaux')+' · '+dateShort(p.d)+' : '+(p.sk&&p.sk[1]>p.sk[0]?'niveau '+p.sk[0]+' → '+p.sk[1]+', ':'')+(p.g.length?p.g.map(x=>TRAIN[x[0]].e+' '+TRAIN[x[0]].n+' '+x[1]+'→'+x[2]).join(', '):'compétences au maximum')+'</li>').join('');
+      h+=card('🎓 Perfectionnement (travaux)','<ul class="alerts">'+L+'</ul>'); } }catch(e){ console.error(e); }
+  return h; }; }
+
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
 document.addEventListener('DOMContentLoaded',boot);

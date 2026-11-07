@@ -1,5 +1,5 @@
 /* Bistrot — service worker : cache hors-ligne (cache-first, mise à jour en arrière-plan) */
-const CACHE = 'bistrot-v9-5';
+const CACHE = 'bistrot-v9-5b';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
