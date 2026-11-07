@@ -7129,6 +7129,232 @@ function v9SumExtra(s){
     }catch(e){ console.error(e); return _ss(s); }
   }; }
 
+
+/* ########## w94.js ########## */
+/* =====================================================================
+   V9.4 · Éditeur de plan gratuit et immédiat · 100 m² offerts à CHAQUE extension
+   · Équipe en 3 blocs (Patron / Employés / Vivier) avec camemberts SVG
+   · Formation du patron : même formule que les employés, +1 point, absent quelques heures
+   ===================================================================== */
+{ const st=document.createElement('style'); st.textContent=
+ '.v94blk{column-span:all;-webkit-column-span:all;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.9fr);gap:10px;margin:0 0 10px}'
++'.v94blk>section{margin:0}.v94hd{column-span:all;-webkit-column-span:all}'
++'.v94pie{display:flex;align-items:center;gap:14px;flex-wrap:wrap}.v94pie svg{flex:none}'
++'.v94leg{flex:1;min-width:120px;font-size:13px}.v94leg div{display:flex;align-items:center;gap:6px;margin:3px 0}.v94leg i{width:11px;height:11px;border-radius:3px;display:inline-block;flex:none}.v94leg b{margin-left:auto}'
++'.v94row{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.6fr) auto;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}.v94row:last-child{border-bottom:0}'
++'.v94row b{font-size:13.5px}.v94row small{display:block;color:var(--mute);font-size:11.5px;line-height:1.25}.v94up{color:var(--ok);font-size:12.5px}.v94dn{color:var(--warn);font-size:12.5px}'
++'.v94sk{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr) 42px auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line)}.v94sk:last-child{border-bottom:0}'
++'.v94days{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:10px}.v94days button{border:0;border-radius:99px;padding:6px 0;background:#f0ece3;font-weight:700;font-size:12px;color:var(--ink)}.v94days button.on{background:var(--acc);color:#fff}.v94days button small{display:block;font-size:9.5px;font-weight:600;opacity:.8}'
++'.v94slots{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}.v94slots button{border:0;border-radius:99px;padding:5px 9px;background:#f0ece3;font-weight:700;font-size:11.5px;color:var(--ink)}.v94slots button.on{background:var(--acc);color:#fff}.v94slots button.wn{box-shadow:inset 0 0 0 2px var(--warn)}'
++'.v94hd .sk{display:grid;grid-template-columns:repeat(3,1fr);gap:4px 8px;font-size:12.5px;margin:6px 0;border:0;padding:0}.v94hd .sk span{display:flex;justify-content:space-between;background:#f6f2ea;border-radius:6px;padding:3px 7px}.v94hd .sk span b{margin-left:6px}.v94tag{font-size:10.5px;border-radius:99px;padding:1px 7px;background:#f3e3e5;color:var(--acc);font-weight:700;margin-left:4px;white-space:nowrap}.v94tag.ok{background:#dff2e6;color:#1f6b46}.v94tag.wn{background:#fbecc9;color:#7a5410}'
++'@media (max-width:700px){.v94blk{grid-template-columns:1fr}}';
+ document.head.appendChild(st); }
+
+/* ---------- camembert SVG (anneau) ---------- */
+const V94COL=['#7a1f2e','#b58a2c','#2e7d57','#c27a10','#4a6fa5','#8e5aa8','#3a8f9a'];
+function v94Pie(sl,center,sz){ sz=sz||118; const r=40, C=2*Math.PI*r, tot=sl.reduce((a,x)=>a+Math.max(0,x.v),0);
+  let off=0, arcs='';
+  if(tot<=0) arcs='<circle cx="60" cy="60" r="'+r+'" fill="none" stroke="#e5ded2" stroke-width="22"/>';
+  else for(const x of sl){ const v=Math.max(0,x.v); if(!v) continue; const L=v/tot*C;
+    arcs+='<circle cx="60" cy="60" r="'+r+'" fill="none" stroke="'+x.col+'" stroke-width="22" stroke-dasharray="'+L.toFixed(2)+' '+(C-L+0.01).toFixed(2)+'" stroke-dashoffset="'+(-off).toFixed(2)+'"/>'; off+=L; }
+  return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 120 120" role="img" aria-label="camembert"><g transform="rotate(-90 60 60)">'+arcs+'</g><circle cx="60" cy="60" r="28" fill="#fff"/><text x="60" y="65" text-anchor="middle" font-size="15" font-weight="800" fill="#1f2530">'+center+'</text></svg>'; }
+function v94Leg(sl){ return '<div class="v94leg">'+sl.map(x=>'<div><i style="background:'+x.col+'"></i><span>'+x.n+'</span><b>'+x.v+'</b></div>').join('')+'</div>'; }
+
+/* =====================================================================
+   1) ÉDITEUR DE PLAN : gratuit, immédiat, sans jours de travaux
+   ===================================================================== */
+function v94Busy(){ return !S.awaitNext && Array.isArray(S.groups) && S.groups.length>0; }
+function v94ApplyPlan(pl){
+  applyPlanToState(S,pl); try{ PPC.key=''; }catch(e){} try{ placeAll(); }catch(e){ console.error(e); } hdrCache='';
+  note('✏️ Nouveau plan en service immédiatement · gratuit ('+S.tables+' tables, '+compilePlan(S.plan).seats+' places).','good'); save(); }
+function v94PlanNow(){ const pl=planClone(ED.plan);
+  if(v94Busy()){ S.v94plan=pl; edClose(); toast('Plan enregistré : il s’applique dès que les clients présents seront partis (gratuit, sans travaux).','info'); note('✏️ Plan modifié (gratuit) : mise en place dès que la salle est vide.','info'); save(); return; }
+  S.v94plan=null; edClose(); v94ApplyPlan(pl); toast('Plan modifié · gratuit et immédiat ✔','good'); }
+edValidate=function(){
+  const ck=planCheck(ED.plan), bad=ck.filter(c=>!c.ok);
+  if(ED.mode==='j0'){
+    if(bad.length){ ED.ck=true; edRender(); showPopup({icon:'🚧',title:'Plan incomplet',body:'<ul class="tips">'+bad.map(c=>'<li>✖ '+c.label+(c.detail?' — '+c.detail:'')+'</li>').join('')+'</ul>',choices:[{label:'Continuer la construction',cb(){}}]}); return; }
+    showPopup({icon:'🏠',title:'Valider mon établissement ?',body:'Votre établissement compte <b>'+compilePlan(ED.plan).tabs.length+' tables</b> et <b>'+compilePlan(ED.plan).seats+' places</b>. Vous pourrez modifier le plan plus tard, gratuitement et sans travaux.',choices:[{label:'Valider ✔',cb(){ v6FinishJ0(planClone(ED.plan)); }},{label:'Continuer à modifier',cls:'ghost',cb(){}}]});
+    return; }
+  const d=planDiff(ED.base,ED.plan);
+  if(!d.changes){ toast('Aucun changement à réaliser.','info'); return; }
+  if(bad.length){ ED.ck=true; edRender(); showPopup({icon:'🚧',title:'Plan incomplet',body:'<ul class="tips">'+bad.map(c=>'<li>✖ '+c.label+(c.detail?' — '+c.detail:'')+'</li>').join('')+'</ul>',choices:[{label:'Continuer',cb(){}}]}); return; }
+  showPopup({icon:'✏️',title:'Appliquer le nouveau plan ?',body:'<p><b>Gratuit</b> (meubles compris) et <b>immédiat</b> : aucun jour de travaux, aucune fermeture.</p>'+(v94Busy()?'<p class="muted">Des clients sont en salle : le plan s’appliquera dès qu’ils seront partis.</p>':''),
+    choices:[{label:'Appliquer ✔',cb(){ v94PlanNow(); }},{label:'Continuer à modifier',cls:'ghost',cb(){}}]});
+};
+travConfirm=function(){ v94PlanNow(); };
+{ const _st=step; step=function(dt){ const r=_st(dt); try{ if(S.v94plan&&!v94Busy()&&!S.trav){ const pl=S.v94plan; S.v94plan=null; v94ApplyPlan(pl); } }catch(e){ console.error(e); } return r; }; }
+{ const _te=ACT.travedit; ACT.travedit=function(){ if(S.trav){ toast('Des travaux d’extension sont en cours : l’éditeur rouvre à leur fin.','warn'); return; } panelClose(); edOpen('trav',planClone(S.v94plan||S.plan)); }; }
+
+/* =====================================================================
+   2) EXTENSIONS : 100 m² offerts à CHAQUE extension, payant au-delà
+   ===================================================================== */
+const X94_FREE=100;
+xPrice=function(pl,side,dp,pur){ const m2=xM2(pl,side,dp); const paid=Math.max(0,m2-X94_FREE); if(paid<=0) return 0; return Math.round(paid*xRate(pl,pur,m2)/10)*10; };
+xSq10Dp=function(pl,side){ const byM2=xDpForM2(pl,side,X94_FREE); const m10=xM2(pl,side,10); if(m10>=X94_FREE*0.7&&m10<=X94_FREE*1.4) return 10; return byM2; };
+xPreview=function(){
+  const pl=S.plan, side=UX.s, dp=xCurDp(pl), pur=UX.p;
+  const m2=xM2(pl,side,dp), c=xPrice(pl,side,dp,pur), np=xExtend(pl,side,dp);
+  showPopup({icon:'📐', title:'Aperçu · extension sur le plan', wide:true, now:1,
+    body:'<canvas id="xprevcv" width="640" height="420" style="width:100%;max-height:48vh;border-radius:12px;background:#2b1a16"></canvas>'
+      +'<div class="chips" style="margin-top:8px"><span class="chip">Avant '+pl.W+'×'+pl.H+'</span><span class="chip ok">Après '+np.W+'×'+np.H+'</span><span class="chip">+'+m2+' m²</span>'
+      +'<span class="chip">'+(c?fm(c)+' (au-delà des 100 m² offerts)':'🎁 gratuit')+'</span></div>'
+      +'<p class="muted" style="margin:6px 0 0">Zone jaune = surface ajoutée sur la façade <b>'+XSIDE[side]+'</b> · usage <b>'+XPUR[pur].n+'</b>. Une fois les travaux terminés, cette extension est intégrée au plan (aménageable gratuitement dans l’éditeur).</p>',
+    choices:[{label:'Fermer l’aperçu', cls:'primary', cb(){}}]});
+  setTimeout(()=>{ const cv=document.getElementById('xprevcv'); if(cv) xPaintPrev(cv, np, pl); }, 60);
+};
+PANELS.ext = { t:()=>'🏗️ Travaux · Extensions', f(){
+  const pl=S.plan, side=UX.s, pur=UX.p, mode=UX.mode||'sq10';
+  const added=xAdded();
+  const dp=xCurDp(pl), m2=xM2(pl,side,dp), c=xPrice(pl,side,dp,pur), ph=xDays(m2,pur), ds=xDates(ph);
+  if(UX.d==null||!ds.some(x=>x[0]===UX.d&&x[2])){ const f=ds.find(x=>x[2]&&closedOn(x[0]))||ds.find(x=>x[2]); UX.d=f?f[0]:ds[0][0]; }
+  const rate=Math.round(xRate(pl,pur,m2));
+  let h='';
+  h+='<div class="card"><h3>✏️ Aménagement du plan</h3><p class="muted" style="margin:0 0 8px">Déplacez murs, tables, cuisine… <b>Gratuit et immédiat</b> : pas de jours de travaux, pas de fermeture, meubles neufs offerts.</p>'
+    +'<div class="btnrow">'+btn('✏️ Modifier le plan (éditeur)','travedit',null,null,'primary')+'</div></div>';
+  h+='<div class="card"><p class="muted">🎁 <b>100 m² offerts à chaque extension</b> (carré 10×10). Seuls les m² <b>au-delà de 100</b> sont payants : '+XPM[pl.pid||0]+' €/m² de base (×'+XPUR[pur].m+' pour '+XPUR[pur].n.toLowerCase()+'), de plus en plus cher avec la surface ajoutée'
+    +(added?' · déjà ajouté <b>+'+added+' m²</b>':'')+' · m² au-delà à ≈ <b>'+rate+' €/m²</b>.</p>'
+    +'<p class="muted" style="margin:0">La façade choisie s’ouvre sur l’extension ; si l’entrée s’y trouve, elle est déplacée sur la nouvelle façade. Les extensions gardent leurs jours de travaux ; à la fin, l’extension est <b>visible et intégrée</b> sur le plan.</p></div>';
+  h+='<div class="card"><h3>1 · Usage prévu</h3><div class="btnrow" style="flex-wrap:wrap">'+Object.keys(XPUR).map(k=>btn(XPUR[k].e+' '+XPUR[k].n,'extp',k,null,k===pur?'primary sm':'ghost sm')).join('')+'</div>'
+   +'<h3>2 · Façade</h3><div class="btnrow" style="flex-wrap:wrap">'+Object.keys(XSIDE).map(k=>btn(XSIDE[k],'exts',k,null,k===side?'primary sm':'ghost sm')).join('')+'</div>'
+   +'<h3>3 · Construction</h3><div class="btnrow" style="flex-wrap:wrap">'
+   +btn('🎁 Carré 10×10 · gratuit','extmode','sq10',null,mode==='sq10'?'primary sm':'ghost sm')
+   +btn('📏 Autre taille','extmode','paid',null,mode==='paid'?'primary sm':'ghost sm')
+   +'</div>';
+  if(mode==='paid'){
+    h+='<div class="btnrow" style="flex-wrap:wrap;margin-top:6px">'+X_PAID_DPS.map(k=>{ const mm=xM2(pl,side,k), pp=xPrice(pl,side,k,pur);
+      return btn(k+' m · +'+mm+' m² · '+(pp?fm(pp):'gratuit'),'extpaid',k,null,(UX.paidDp===k?'primary sm':'ghost sm')); }).join('')+'</div>'
+      +'<p class="muted" style="margin:6px 0 0">Jusqu’à 100 m² : gratuit. Au-delà : seuls les m² supplémentaires sont facturés.</p>';
+  } else h+='<p class="muted" style="margin:8px 0 0">Extension offerte : <b>+'+m2+' m²</b> (équivalent carré 10×10) sur la façade choisie → local <b>'+xDimLabel(pl,side,dp)+'</b>.</p>';
+  h+='</div>';
+  h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+xDimLabel(pl,side,dp)+'<br>Coût : <b>'+(c?fm(c)+'</b> (dont '+Math.min(m2,X94_FREE)+' m² offerts)':'0 € · gratuit</b>')+' · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+(pur==='cuisine'?'cuisine fermée, ':'')+'gros travaux : fermeture totale, prime et congés selon la règle des travaux)</p>'
+   +'<label style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Quand ?</span><select class="sl" data-sel="extwhen">'+ds.map(x=>'<option value="'+x[0]+'"'+(x[0]===UX.d?' selected':'')+(x[2]?'':' disabled')+'>'+x[1]+'</option>').join('')+'</select></label>'
+   +(c>S.cash?'<p class="bad">Trésorerie insuffisante : il manque '+fm(c-S.cash)+'. Réduisez la taille ou empruntez (onglet Finances).</p>':'')
+   +'<div class="btnrow" style="flex-wrap:wrap;margin-top:8px">'+btn('👀 Voir le plan avant de lancer','extprev',null,null,'ghost')+btn('Commander l’extension · '+(c?fm(c):'gratuit'),'extgo',null,null,'primary')+'</div></div>';
+  const X=XS(); if(X.sched.length) h+='<div class="card"><h3>Programmées</h3>'+X.sched.map(x=>'<p>'+XPUR[x.pur].e+' +'+x.m2+' m² · '+dateShort(x.start)+' → '+dateShort(x.start+x.ph-1)+(x.started?' · en cours':'')+(x.c?' · '+fm(x.c):' · offert')+'</p>').join('')+'</div>';
+  if(X.done.length) h+='<div class="card"><h3>Déjà intégrées au plan</h3>'+X.done.map(x=>'<p>'+XPUR[x.pur].e+' +'+x.m2+' m² · jour '+x.day+(x.free?' · offert':'')+'</p>').join('')+'</div>';
+  return h; }};
+ACT.extmode=function(k){ UX.mode=k; if(k==='sq10') UX.dp=xSq10Dp(S.plan,UX.s); panelRender(true); };
+{ const _xd=v7ExtDone; v7ExtDone=function(T){ let s=null; try{ s=T&&T.ext&&XS().sched.find(x=>x.id===T.ext); }catch(e){} const r=_xd(T); try{ if(s&&!s.c){ const L=XS().done; if(L.length) L[L.length-1].free=1; } }catch(e){} return r; }; }
+
+/* =====================================================================
+   3) PATRON : bloc + formation comme les employés (+1, absent ~5 h)
+   ===================================================================== */
+const V94PSK=[['gest','📊','Gestion'],['acc','🤝','Accueil'],['cook','👨‍🍳','Cuisine'],['somm','🍷','Sommellerie'],['dish','🧽','Plonge'],['fame','📣','Notoriété']];
+const v94PCost=lv=>120+110*(lv||0);
+const v94PAway=()=>!!(S&&S.patron&&S.patron.away&&S.t<S.patron.away.until);
+patronCard=function(){ const P=S.patron||(S.patron={sk:{},trn:[],cap:10}); P.sk=P.sk||{}; const sk=P.sk, cap=patronCap();
+  const got=V94PSK.reduce((a,x)=>a+Math.min(cap,sk[x[0]]||0),0), max=V94PSK.length*cap, A=P.away&&S.t<P.away.until?P.away:null;
+  const pie=v94Pie([{v:got,col:V94COL[0]},{v:max-got,col:'#d9d1c4'}],got+'/'+max);
+  let st=A?'🎓 En formation « '+(V94PSK.find(x=>x[0]===A.k)||['','',''])[2]+' » · retour '+((Math.floor(A.until/1440)>Math.floor(S.t/1440))?'demain ':'')+'à '+hhmm(A.until%1440):'✅ Disponible';
+  const left='<section class="card"><h3 style="text-transform:uppercase;font-size:12.5px;letter-spacing:.6px;color:var(--mute)">👤 Patron · '+rName()+'</h3>'
+    +'<div class="v94pie">'+pie+v94Leg([{n:'Compétences acquises',v:got,col:V94COL[0]},{n:'Reste à gagner',v:max-got,col:'#d9d1c4'}])+'</div>'
+    +'<p class="'+(A?'chip warn':'muted')+'" style="margin:8px 0 0">'+st+'</p>'
+    +'<p class="muted" style="margin:6px 0 0;font-size:11.5px">Formation : <b>+1 point</b> par séance, prix selon le niveau (comme les employés : 120 € + 110 € × niveau). Pendant la formation vous êtes <b>absent quelques heures</b> (pas de renfort en salle ni en cuisine). Plafond '+cap+'/'+cap+(cap<20?' · 20 après une étoile Michelin':'')+'.</p>'
+    +'<div class="chips" style="margin-top:6px"><span class="chip">👔 Propriétaire</span><span class="chip ok">🔄 Polyvalent</span><span class="chip">💶 pas de salaire</span></div></section>';
+  const rows=V94PSK.map(x=>{ const v=Math.min(cap,sk[x[0]]||0), c=v94PCost(v), mx=v>=cap;
+    return '<div class="v94sk"><b>'+x[1]+' '+x[2]+'</b>'+bar(v/cap*100,v/cap>=0.6?'var(--acc)':'var(--gold)')+'<b style="text-align:right">'+v+'/'+cap+'</b>'
+      +btn(mx?'Niveau max':'Former · '+fm(c),'ptrn',x[0],null,'primary sm',mx||!!A)+'</div>'; }).join('');
+  const right='<section class="card"><h3 style="text-transform:uppercase;font-size:12.5px;letter-spacing:.6px;color:var(--mute)">Mes compétences</h3>'+rows
+    +'<small class="muted">'+PATRON_TRN.map(t=>t.e+' '+t.d).join(' · ')+'</small></section>';
+  return '<h4 class="sec v94hd">Patron</h4><div class="v94blk">'+left+right+'</div>'; };
+function v94PTrain(id){ const P=S.patron, cap=patronCap(); if(!P) return {ok:false,msg:'Indisponible.'}; P.sk=P.sk||{};
+  if(v94PAway()) return {ok:false,msg:'Vous êtes déjà en formation.'}; P.v94gone=0;
+  try{ if(typeof rcOn==='function'&&rcOn()) return {ok:false,msg:'Pas pendant les entretiens d’embauche.'}; }catch(e){}
+  const lv=P.sk[id]||0; if(lv>=cap) return {ok:false,msg:'Niveau maximum.'};
+  const c=v94PCost(lv); if(c>S.cash) return {ok:false,msg:'Trésorerie insuffisante ('+money(c)+').'};
+  spend(c,'other'); const until=(S.awaitNext?nextOpen():S.t)+TRAIN_DUR; P.away={k:id,until,cost:c};
+  const nm=(V94PSK.find(x=>x[0]===id)||['','',''])[2];
+  note('🎓 Patron en formation « '+nm+' » · '+fm(c)+' · absent jusqu’à '+hhmm(until%1440)+(Math.floor(until/1440)>Math.floor(S.t/1440)?' (demain)':'')+'.','info');
+  return {ok:true,msg:'Vous partez en formation « '+nm+' » (retour à '+hhmm(until%1440)+').'}; }
+function v94PFinish(){ const P=S&&S.patron; if(!P||!P.away||S.t<P.away.until) return; const A=P.away; P.away=null; P.v94gone=0;
+  P.sk[A.k]=clamp((P.sk[A.k]||0)+1,0,patronCap()); if(A.k==='fame'){ S.rep=Math.min(5,S.rep+0.04); S.soc.fol+=rint(5,15); }
+  const nm=(V94PSK.find(x=>x[0]===A.k)||['','',''])[2]; note('🎓 Retour de formation : '+nm+' niveau '+P.sk[A.k]+'/'+patronCap()+' !','good'); try{ H.sound('levelup'); }catch(e){} }
+ACT.ptrn=function(id){ const r=v94PTrain(id); toast(r.msg,r.ok?'good':'bad'); if(r.ok) save(); renderTab(true); };
+{ const _tt=tickTraining; tickTraining=function(){ _tt(); try{ v94PFinish(); }catch(e){ console.error(e); } }; }
+/* le patron quitte la salle pendant sa formation */
+{ const _se=syncStaffEnts; syncStaffEnts=function(){ _se(); try{ const P=S.patron, e=R.ent.P;
+    if(v94PAway()){ if(e){ if(P.v94gone&&!e.v94out){ delete R.ent.P; return; } if(Math.hypot(e.x-DOOR.x,e.y-DOOR.y)<16){ delete R.ent.P; P.v94gone=1; return; } const L=e.path&&e.path.length?e.path[e.path.length-1]:null; if(!e.v94out||!L||Math.hypot(L.x-DOOR.x,L.y-DOOR.y)>4){ e.v94out=1; P.v94gone=1; entGo(e,DOOR.x,DOOR.y); } e.leave=true; e.task=null; } else P.v94gone=1; }
+    else if(e&&e.v94out){ delete R.ent.P; if(P) P.v94gone=0; } }catch(err){ console.error(err); } }; }
+
+function v94Scroll(sel){ setTimeout(()=>{ try{ const e=document.querySelector(sel); if(e){ e.scrollIntoView({block:'start'}); let n=e.parentElement; while(n&&n!==document.body){ if(n.scrollHeight>n.clientHeight+4&&/(auto|scroll)/.test(getComputedStyle(n).overflowY)){ n.scrollTop-=64; break; } n=n.parentElement; } if(!n||n===document.body) window.scrollBy(0,-64); } }catch(err){} },30); }
+/* =====================================================================
+   4) EMPLOYÉS : sélecteur de jour + camembert + liste compacte → fiche
+   ===================================================================== */
+const V94ATT=[['vit','spd','Vitesse'],['qua','qual','Qualité'],['ami','ami','Amabilité'],['aut','aut','Autonomie'],['hyg',null,'Hygiène']];
+function v94Att(s){ const sub=s.sub||{}, lv=s.lv||{}, base=clamp(Math.round((s.skill||1)*0.8),1,10);
+  return V94ATT.map(a=>{ const v0=sub[a[0]]!=null?sub[a[0]]:base; const v=clamp(Math.round(v0+(a[1]?2*(lv[a[1]]||0):0)),0,10); return {n:a[2],v}; }); }
+function v94Perm(){ return S.staff.filter(s=>!s.tmp); }
+function v94RoleN(s){ try{ if(s.post&&POSTS[s.post]) return POSTS[s.post].n; }catch(e){} return ROLE[s.role]?ROLE[s.role].n:s.role; }
+const _v94vs=viewStaff;
+viewStaff=function(){
+  const sel=ui.v94emp!=null?S.staff.find(x=>x.id===ui.v94emp):null;
+  if(ui.v94emp!=null&&!sel) ui.v94emp=null;
+  if(sel){ const real=S.staff; let out='';
+    try{ S.staff=[sel]; out=_v94vs(); }catch(e){ console.error(e); } finally{ S.staff=real; }
+    const k=out.indexOf('<h4 class="sec">Équipe en place</h4>'); const k0=out.indexOf('<section class="card cardwarn">');
+    const HD='<h4 class="sec">Équipe en place</h4>'; let body=k>=0?out.slice(k+HD.length):out; if(k0>=0&&k0<k&&out.slice(k0,k).includes(sel.name)) body=out.slice(k0,k)+body;
+    return '<div class="v94hd v94back" style="margin:0 0 8px">'+btn('← Retour à la liste','v94emp','x',null,'ghost')+'</div>'+body; }
+  const full=_v94vs(); const k=full.indexOf('<h4 class="sec">Équipe en place</h4>'); const pre=k>=0?full.slice(0,k):'';
+  const d0=dayNum(), w0=(d0-1)%7, base=d0-w0; if(ui.v94day==null) ui.v94day=w0; const wd=ui.v94day, dd=base+wd;
+  const perm=v94Perm(); const isOff=s=>{ try{ return absentDay(s,dd)||onLeave(s,dd); }catch(e){ return false; } };
+  const offN=S.staff.filter(s=>isOff(s)).length;
+  let got=0, max=0; for(const s of perm){ const A=v94Att(s); got+=A.reduce((a,x)=>a+x.v,0); max+=A.length*10; }
+  const days='<div class="v94days">'+DAYS3.map((x,w)=>{ const n=S.staff.filter(s=>{ try{ return absentDay(s,base+w)||onLeave(s,base+w); }catch(e){ return false; } }).length;
+    return '<button class="'+(w===wd?'on':'')+'" data-a="v94day" data-p="'+w+'">'+x+'<small>'+(n?n+' repos':'—')+'</small></button>'; }).join('')+'</div>';
+  const pc=max?Math.round(got/max*100):0;
+  const left='<section class="card">'+days+'<div class="v94pie">'+v94Pie([{v:got,col:V94COL[0]},{v:max-got,col:'#d9d1c4'}],pc+' %')+v94Leg([{n:'Acquis (équipe)',v:got,col:V94COL[0]},{n:'Reste à gagner',v:max-got,col:'#d9d1c4'}])+'</div>'
+    +'<p class="muted" style="margin:8px 0 0;font-size:11.5px">'+DOWN[wd]+(dd===d0?' (aujourd’hui)':'')+' : <b>'+offN+'</b> en repos (badge « repos » dans la liste). Les formations restent dans la fiche de chaque employé. Touchez une ligne pour ouvrir la fiche complète.</p></section>';
+  const rows=S.staff.map(s=>{ const A=v94Att(s).slice().sort((a,b)=>b.v-a.v); const hi=A[0], lo=A.slice(-2).filter(x=>x.v<hi.v);
+    const tags=(isOff(s)?'<span class="v94tag">repos</span>':'')+(s.trn?'<span class="v94tag wn">formation</span>':'')+(s.tmp?'<span class="v94tag ok">intérim</span>':'');
+    return '<div class="v94row" data-a="v94emp" data-p="'+s.id+'" style="cursor:pointer"><div><b>'+s.name+'</b>'+tags+'<small>'+(ROLE[s.role]?ROLE[s.role].e+' ':'')+v94RoleN(s)+' · niv '+s.skill+'</small></div>'
+      +'<div><div class="v94up">▲ '+hi.n+' '+hi.v+'</div><div class="v94dn">▼ '+(lo.length?lo.map(x=>x.n+' '+x.v).join(', '):'—')+'</div></div>'+btn('Fiche ›','v94emp',s.id,null,'primary sm')+'</div>'; }).join('')||'<p class="muted">Personne n’est embauché.</p>';
+  const right='<section class="card"><h3 style="text-transform:uppercase;font-size:12.5px;letter-spacing:.6px;color:var(--mute)">Employés · touchez une ligne pour la fiche</h3>'+rows+'</section>';
+  return '<h4 class="sec v94hd v94emph">Employés</h4><div class="v94blk">'+left+right+'</div>'+pre; };
+Object.assign(ACT,{ v94emp(p){ ui.v94emp=(p==='x'||p==null)?null:+p; ui.last=''; renderTab(true); v94Scroll(ui.v94emp!=null?'.v94back':'.v94emph'); },
+  v94day(p){ ui.v94day=+p; ui.last=''; renderTab(true); } });
+
+/* =====================================================================
+   5) VIVIER : camembert des remplacements par intérimaire + liste → fiche
+   ===================================================================== */
+{ const _va=v9VivAuto; v9VivAuto=function(){ const r=_va.apply(this,arguments); try{ const d=dayNum();
+    for(const s of S.staff){ if(!(s.tmp&&s.v9dep&&s.v9vid)) continue; const h=v9VivById(s.v9vid); if(h&&h.c.repD!==d){ h.c.repD=d; h.c.rep=(h.c.rep||0)+1; } } }catch(e){ console.error(e); } return r; }; }
+function v94Want(c){ if(c.want==null){ const m=c.motiv||''; c.want=/CDI|stable|installer|Habite/.test(m)?'cdi':/expérience|prouver/.test(m)?'cdd':((c.att||5)>=7?'cdi':''); } return c.want; }
+function v94Mot(c){ const a=c.att||5; return a>=8?'Très motivé(e)':a>=6?'Motivé(e)':a>=4?'Moyen':'Peu motivé(e)'; }
+function v94VAtt(c){ const s=c.sub||{}; return [['Vitesse',s.vit],['Qualité',s.qua],['Amabilité',s.ami],['Autonomie',s.aut],['Hygiène',s.hyg]].filter(x=>x[1]!=null).map(x=>({n:x[0],v:x[1]})).sort((a,b)=>b.v-a.v); }
+v9VivSection=function(){
+  if(dayNum()<OPEN_DAY) return ''; v9VivFill();
+  if(ui.v94viv!=null){ const hit=v9VivById(ui.v94viv); if(hit) return '<h4 class="sec v94hd">🧰 Vivier intérim · fiche</h4><div class="v94hd v94back" style="margin:0 0 8px">'+btn('← Retour à la liste','v94viv','x',null,'ghost')+'</div><div class="v94hd">'+v9VivCard(hit.c,hit.sl).replace('</small></div><div class="pr">',' · remplacements ×'+(hit.c.rep||0)+(v94Want(hit.c)?' · veut un '+v94Want(hit.c).toUpperCase():'')+'</small></div><div class="pr">')+'</div>'; ui.v94viv=null; }
+  const slots=Object.keys(SLOTS); if(!ui.v94sl||!SLOTS[ui.v94sl]) ui.v94sl=slots.find(sl=>v9Gap(sl)>0)||slots[0]; const sl=ui.v94sl;
+  const L=(S.vivier[sl]||[]).slice().sort((a,b)=>(b.rep||0)-(a.rep||0)||(b.note||0)-(a.note||0));
+  const tot=L.reduce((a,c)=>a+(c.rep||0),0); const used=L.filter(c=>c.rep>0), zero=L.filter(c=>!c.rep);
+  const sl2=used.map((c,i)=>({n:c.name,v:c.rep,col:V94COL[i%V94COL.length]}));
+  const gap=v9Gap(sl), vac=v9Vacancy(sl);
+  const chips='<div class="v94slots">'+slots.map(k=>'<button class="'+(k===sl?'on':'')+(v9Gap(k)>0?' wn':'')+'" data-a="v94sl" data-p="'+k+'">'+SLOTS[k].n.replace(/ \(.*\)/,'')+'</button>').join('')+'</div>';
+  const left='<section class="card">'+chips+'<div class="v94pie">'+v94Pie(sl2.length?sl2:[{v:0,col:'#ddd'}],tot+' fois')+(sl2.length?v94Leg(sl2):'<div class="v94leg"><small class="muted">Aucun remplacement pour l’instant.</small></div>')+'</div>'
+    +'<p class="muted" style="margin:8px 0 0;font-size:11.5px">'+(zero.length?zero.map(c=>c.name).join(', ')+' : 0 remplacement (pas dans le camembert). ':'')+(gap?'<b>Sous-effectif −'+gap+'</b>'+(vac?' · '+vac+' poste(s) vacant(s)':'')+' : les meilleurs passent en service automatiquement.':'Poste complet : le vivier attend.')+' Absence = 1 jour · poste vacant = jusqu’à une embauche. Salaire = celui du poste. Aucun intérim pendant les travaux.</p></section>';
+  const rows=L.map(c=>{ const A=v94VAtt(c), hi=A[0], w=v94Want(c), dep=S.staff.some(s=>s.tmp&&s.v9dep&&s.v9vid===c.id&&s.tmpDay===dayNum());
+    return '<div class="v94row" data-a="v94viv" data-p="'+c.id+'" style="cursor:pointer"><div><b>'+c.name+' · '+(c.note||'?')+'/10</b>'+(dep?'<span class="v94tag ok">en service</span>':'')+'<small>'+((POSTS[c.post]||{}).n||SLOTS[sl].n)+' · remplacements ×'+(c.rep||0)+'</small></div>'
+      +'<div><div><span class="v94up">'+(hi?'▲ '+hi.n+' '+hi.v:'▲ '+((c.quals||[])[0]||'—'))+'</span> · <span class="v94dn">▼ '+((c.defs||[])[0]||'—')+'</span></div><div style="font-size:12.5px">Motivation : '+v94Mot(c)+(w?' <span class="v94tag '+(w==='cdi'?'ok':'wn')+'">veut un '+w.toUpperCase()+'</span>':'')+'</div></div>'
+      +btn('Fiche','v94viv',c.id,null,'primary sm')+'</div>'; }).join('')||'<p class="muted">Vivier vide…</p>';
+  const right='<section class="card"><h3 style="text-transform:uppercase;font-size:12.5px;letter-spacing:.6px;color:var(--mute)">Vivier intérim · '+SLOTS[sl].n+' · touchez une ligne pour la fiche</h3>'+rows+'</section>';
+  return '<h4 class="sec v94hd v94vivh">🧰 Vivier intérim (5 / poste)</h4><div class="v94blk">'+left+right+'</div>'; };
+Object.assign(ACT,{ v94viv(p){ ui.v94viv=(p==='x'||p==null)?null:+p; ui.last=''; renderTab(true); v94Scroll(ui.v94viv!=null?'.v94back':'.v94vivh'); },
+  v94sl(p){ ui.v94sl=p; ui.v94viv=null; ui.last=''; renderTab(true); } });
+/* embauche depuis la fiche → retour à la liste */
+{ const _h=ACT.v9hcdi, _d=ACT.v9hcdd; ACT.v9hcdi=function(p){ ui.v94viv=null; return _h(p); }; ACT.v9hcdd=function(p){ ui.v94viv=null; return _d(p); }; }
+
+/* migration v9.3 → v9.4 : ancienne liste des formations patron suivies, quota d'extension global */
+setTimeout(()=>{ try{ if(S&&S.patron){ if(S.patron.away&&!S.patron.away.until) S.patron.away=null; } if(S&&S.vivier) for(const k in S.vivier) for(const c of S.vivier[k]) if(c.rep==null) c.rep=0; }catch(e){} },900);
+
+/* v9.4 — éditeur : libellés « gratuit » (bouton + palette) */
+(function(){ const _er=edRender; edRender=function(){ const r=_er.apply(this,arguments);
+  try{ if(ED.open&&ED.mode==='trav'){
+    const b=document.querySelector('[data-ed="valid"]'); if(b&&/Travaux/.test(b.textContent)) b.textContent='Appliquer le plan · gratuit ▶';
+    document.querySelectorAll('[data-ed="tool"] small').forEach(s=>{ if(/€/.test(s.textContent)) s.textContent='offert'; });
+  } }catch(e){}
+  return r; }; })();
+
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
 document.addEventListener('DOMContentLoaded',boot);
