@@ -2773,7 +2773,7 @@ function viewStaff(){
     b+='<div class="stats">'+stat('Niveau '+s.skill,s.skill>=10?100:s.xp/xn*100,'var(--gold)')+stat('Moral',s.mor)+stat('Énergie',100-s.fat,colFor(100-s.fat))+'</div><small class="xpl">XP '+Math.round(s.xp)+' / '+xn+(s.skill>=10?' (max)':'')+' · autonomie <b>'+aut+'/5</b> — '+autLabel(aut)+'</small>';
     if(s.role!=='dish'){
       b+='<div class="trg">'; for(const k in TRAIN){ const lv=s.lv[k]; const c=120+110*lv; const max=lv>=TRAIN_MAX;
-        b+='<button class="tr" data-a="trainAttr" data-p="'+s.id+'" data-q="'+k+'"'+(max||s.trn?' disabled':'')+'><span>'+TRAIN[k].e+' '+TRAIN[k].n+'</span><i class="lvl">'+'●'.repeat(lv)+'○'.repeat(TRAIN_MAX-lv)+'</i><small>'+(max?'niveau max':'Former · '+fm(c))+'</small></button>'; }
+        b+='<button class="tr" data-a="trainAttr" data-p="'+s.id+'" data-q="'+k+'"'+(max||s.trn?' disabled':'')+'><span>'+TRAIN[k].e+' '+TRAIN[k].n+'</span><i class="lvl">'+'●'.repeat(Math.max(0,Math.min(TRAIN_MAX,lv)))+'○'.repeat(Math.max(0,TRAIN_MAX-lv))+'</i><small>'+(max?'niveau max':'Former · '+fm(c))+'</small></button>'; }
       b+='</div>';
       const sks=Object.keys(SKILLS).filter(k=>SKILLS[k].role==='any'||SKILLS[k].role===s.role||(s.role==='bar'&&SKILLS[k].role==='waiter'&&k==='sommellerie'));
       b+='<div class="chips">'+sks.filter(k=>s.sk[k]).map(k=>'<span class="chip ok">'+SKILLS[k].e+' '+SKILLS[k].n+'</span>').join('')+'</div>';
@@ -7760,7 +7760,7 @@ function v95MdjFill(){ const m=S.mdj; if(!m||!m.on||m.day!==dayNum()||!mdjOpen()
    chaque compétence (spd/qual/ami/aut), bilan visible à la réouverture,
    historique dans la fiche, rattrapage des travaux passés.
    ===================================================================== */
-function v95PerfApply(s,d,tag){ const cap=(S.mich&&S.mich.star)?Math.max(TRAIN_MAX,10):TRAIN_MAX; s.lv=s.lv||{};
+function v95PerfApply(s,d,tag){ const cap=TRAIN_MAX; s.lv=s.lv||{};
   const g=[]; for(const k in TRAIN){ const a=s.lv[k]||0, b=Math.min(cap,a+1); if(b>a){ s.lv[k]=b; g.push([k,a,b]); } }
   (s.v95perf=s.v95perf||[]).push({d,g,tag:tag||''}); return g; }
 { const _ds=v6DayStart; v6DayStart=function(){
@@ -7789,6 +7789,10 @@ setInterval(()=>{ try{ if(S&&S.staff&&!S.v95perfMig) v95PerfMigrate(); }catch(e)
       const L=sel.v95perf.slice(-6).reverse().map(p=>'<li>'+(p.tag==='rattrapage'?'Rattrapage travaux passés':'Travaux')+' · '+dateShort(p.d)+' : '+(p.sk&&p.sk[1]>p.sk[0]?'niveau '+p.sk[0]+' → '+p.sk[1]+', ':'')+(p.g.length?p.g.map(x=>TRAIN[x[0]].e+' '+TRAIN[x[0]].n+' '+x[1]+'→'+x[2]).join(', '):'compétences au maximum')+'</li>').join('');
       h+=card('🎓 Perfectionnement (travaux)','<ul class="alerts">'+L+'</ul>'); } }catch(e){ console.error(e); }
   return h; }; }
+/* v9.5c : niveaux de formation bornés au maximum (corrige l’onglet Équipe) */
+function v95LvFix(){ try{ if(!S||!S.staff) return; for(const s of S.staff){ if(!s.lv) continue; for(const k in s.lv){ const v=+s.lv[k]||0; if(v>TRAIN_MAX||v<0) s.lv[k]=Math.max(0,Math.min(TRAIN_MAX,v)); } } }catch(e){} }
+v95LvFix(); setInterval(v95LvFix,1500);
+{ const _vt=viewStaff; viewStaff=function(){ v95LvFix(); return _vt.apply(this,arguments); }; }
 
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
