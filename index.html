@@ -250,7 +250,7 @@ const inWin = (w,m) => w.some(x=>m>=x[0]&&m<x[1]);
 const DAYS = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 const DOW_MULT = [0.95,0.95,1.0,1.08,1.18,1.28,1.05];
 const SAVE_KEY = 'bistrot_save_v1';   // même clé que la v1 (migration automatique)
-const SAVE_VER = 10;
+const SAVE_VER = 11;
 const SET_KEY = 'bistrot_settings_v1';
 const G0 = 8.6;                   // groupes / heure au pic (facteur 1)
 const BANKRUPT_CASH = -300, BANKRUPT_DAYS = 3;
@@ -1036,7 +1036,7 @@ function ingCost(i){ const st=S.stock[i]; return st.q>0?st.cost:ING[i].p*1.1; }
 function dishCost(id){ let c=0; for(const i in DISH[id].rec) c+=ingCost(i)*DISH[id].rec[i]; return c; }
 function fairPrice(d,q){ return d.ref*(0.6+0.16*q); }
 
-const dishLocked = id=>!!(DISH[id].sk&&!S.learned[DISH[id].sk]);
+let dishLocked = id=>!!(DISH[id].sk&&!S.learned[DISH[id].sk]);
 function dishAvail(id){ if(!S.menu[id].on||dishLocked(id)) return false; const r=DISH[id].rec; for(const i in r) if(S.stock[i].q<r[i]) return false; return true; }
 
 /* ---------- Personnel ---------- */
@@ -3004,7 +3004,7 @@ function typedApply(el){ const r=typedSet(el.dataset.t,el.dataset.p,el.value); i
 document.addEventListener('change',e=>{ const el=e.target; if(!el||!el.classList) return;
   if(el.classList.contains('ti')){ try{ typedApply(el); }catch(err){ console.error(err); } }
   else if(el.dataset&&el.dataset.sel){ try{ if(el.dataset.sel==='mdj') result(A_mdjSet(el.dataset.p,el.value)); }catch(err){ console.error(err); } renderTab(true); updateHeader(); } });
-document.addEventListener('input',e=>{ const el=e.target; if(el&&el.classList&&el.classList.contains('ti')){ const T=TYP[el.dataset.t]; const v=el.value.replace(T&&T.dec?/[^0-9.,]/g:/[^0-9]/g,''); if(v!==el.value) el.value=v; } });
+document.addEventListener('input',e=>{ const el=e.target; if(el&&el.classList&&el.classList.contains('ti')&&el.dataset.t){ const T=TYP[el.dataset.t]; const v=el.value.replace(T&&T.dec?/[^0-9.,]/g:/[^0-9]/g,''); if(v!==el.value) el.value=v; } });
 document.addEventListener('focusin',e=>{ const el=e.target; if(el&&el.classList&&el.classList.contains('ti')) setTimeout(()=>{ try{ el.select(); }catch(_){} },0); });
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target&&e.target.classList&&e.target.classList.contains('ti')){ e.preventDefault(); e.target.blur(); } });
 const ACT={
@@ -4413,10 +4413,10 @@ function autoCheck(){ if(S.pw&&!S.pw.j0&&dayNum()>=6) autoCheck_v5(); }
    ===================================================================== */
 const MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const monthIdx=d=>monthKey(d||dayNum());
-const calMonth=d=>ymd(d||dayNum()).m;
+let calMonth=d=>ymd(d||dayNum()).m;
 const dayInMonth=d=>ymd(d||dayNum()).dd;
 const daysInMonthOf=d=>{ const x=ymd(d||dayNum()); return ymdS(serOf(x.y,x.m+1,0)).dd; };
-const libFood=()=>Object.keys(DISH).filter(i=>!DISH[i].bar&&DISH[i].cat!=='boisson'&&!DISH[i].mdjd&&!DISH[i].fest&&S.menu[i]);
+let libFood=()=>Object.keys(DISH).filter(i=>!DISH[i].bar&&DISH[i].cat!=='boisson'&&!DISH[i].mdjd&&!DISH[i].fest&&S.menu[i]);
 const inSeason=(id,mo)=>!DISH[id].season||DISH[id].season.includes(mo!=null?mo:calMonth());
 const DR_TYPES={alc:{n:'Alcools',e:'🍷',ids:['vin','rose','vinb','biere','cidre','kir','spritz']},soft:{n:'Softs',e:'🥤',ids:['soda','jus','eau']},hot:{n:'Boissons chaudes',e:'☕',ids:['cafe','the','choco','capp']}};
 const ingList=id=>Object.keys(DISH[id].rec).map(i=>ING[i].e+' '+ING[i].n.toLowerCase()+(DISH[id].rec[i]>1?' ×'+DISH[id].rec[i]:'')).join(' · ');
@@ -5023,7 +5023,7 @@ function calDemand(m){ const ci=calInfo(); let f=1; const nz=vacZones(); if(nz) 
   if(ci.ferie){ const lunch=(m==null?minOfDay():m)<960; f*=lunch?1.2:0.9; if(ci.ferie.k==='an'||ci.ferie.k==='noel') f*=0.8; }
   else if(ci.fete&&(ci.fete.k==='meres'||ci.fete.k==='peres'||ci.fete.k==='valent')){ f*=((m==null?minOfDay():m)<960&&ci.fete.k!=='valent')?1.15:1.1; }
   return f; }
-const calTouristP=()=>{ const nz=vacZones(); return nz?0.03+0.035*nz:0; };
+let calTouristP=()=>{ const nz=vacZones(); return nz?0.03+0.035*nz:0; };
 const calFamilyP=()=>{ const ci=calInfo(); let f=1; const nz=vacZones(); if(nz) f*=1+0.18*nz; if(ci.ferie&&minOfDay()<960) f*=1.8; else if(ci.ferie) f*=1.2; if(ci.fete&&(ci.fete.k==='meres'||ci.fete.k==='peres')&&minOfDay()<960) f*=1.6; return f; };
 
 /* ---------- §2 congés & fermeture ---------- */
@@ -7793,6 +7793,1437 @@ setInterval(()=>{ try{ if(S&&S.staff&&!S.v95perfMig) v95PerfMigrate(); }catch(e)
 function v95LvFix(){ try{ if(!S||!S.staff) return; for(const s of S.staff){ if(!s.lv) continue; for(const k in s.lv){ const v=+s.lv[k]||0; if(v>TRAIN_MAX||v<0) s.lv[k]=Math.max(0,Math.min(TRAIN_MAX,v)); } } }catch(e){} }
 v95LvFix(); setInterval(v95LvFix,1500);
 { const _vt=viewStaff; viewStaff=function(){ v95LvFix(); return _vt.apply(this,arguments); }; }
+
+/* ===== v9.6 part a ===== */
+/* v9.6 — données centralisées des 44 lieux (valeurs de jeu indicatives). */
+const LIEUX=[
+ {
+  "n": "Paris",
+  "e": "🗼",
+  "g": "FR",
+  "aff": 1.3,
+  "sal": 1.15,
+  "prix": 1.2,
+  "trav": 1.25,
+  "local": 1500000,
+  "zone": "Zone C · fériés FR",
+  "wx": "Océanique doux",
+  "tour": "Toute l'année, pic été",
+  "spec": [
+   "Soupe à l'oignon",
+   "Croque-monsieur",
+   "Paris-Brest"
+  ],
+  "noms": [
+   "Martin",
+   "Bernard",
+   "Dubois",
+   "Lefèvre"
+  ],
+  "id": "paris",
+  "lat": 48.86,
+  "lon": 2.35,
+  "sud": false
+ },
+ {
+  "n": "Île-de-France (hors Paris)",
+  "e": "🏘️",
+  "g": "FR",
+  "aff": 1.05,
+  "sal": 1.08,
+  "prix": 1.05,
+  "trav": 1.1,
+  "local": 700000,
+  "zone": "Zone C",
+  "wx": "Océanique",
+  "tour": "Faible",
+  "spec": [
+   "Brie de Meaux",
+   "Potage Saint-Germain"
+  ],
+  "noms": [
+   "Moreau",
+   "Laurent",
+   "Simon",
+   "Michel"
+  ],
+  "id": "idf",
+  "lat": 48.8,
+  "lon": 2.5,
+  "sud": false
+ },
+ {
+  "n": "Auvergne-Rhône-Alpes",
+  "e": "🏔️",
+  "g": "FR",
+  "aff": 1.0,
+  "sal": 1.0,
+  "prix": 1.0,
+  "trav": 1.0,
+  "local": 450000,
+  "zone": "Zone A",
+  "wx": "Continental, hiver neigeux",
+  "tour": "Pic hiver (ski) + été",
+  "spec": [
+   "Tartiflette",
+   "Quenelles",
+   "Saint-Marcellin"
+  ],
+  "noms": [
+   "Garnier",
+   "Faure",
+   "Rousset",
+   "Chabert"
+  ],
+  "id": "ara",
+  "lat": 45.76,
+  "lon": 4.84,
+  "sud": false
+ },
+ {
+  "n": "Bourgogne-Franche-Comté",
+  "e": "🍷",
+  "g": "FR",
+  "aff": 0.8,
+  "sal": 0.95,
+  "prix": 0.98,
+  "trav": 0.92,
+  "local": 300000,
+  "zone": "Zone A",
+  "wx": "Continental",
+  "tour": "Vendanges (sept.)",
+  "spec": [
+   "Bœuf bourguignon",
+   "Œufs en meurette",
+   "Comté"
+  ],
+  "noms": [
+   "Bonnot",
+   "Mercier",
+   "Guyot"
+  ],
+  "id": "bfc",
+  "lat": 47.32,
+  "lon": 5.04,
+  "sud": false
+ },
+ {
+  "n": "Bretagne",
+  "e": "⚓",
+  "g": "FR",
+  "aff": 0.9,
+  "sal": 0.95,
+  "prix": 0.95,
+  "trav": 0.95,
+  "local": 320000,
+  "zone": "Zone B",
+  "wx": "Océanique pluvieux",
+  "tour": "Fort été",
+  "spec": [
+   "Galette complète",
+   "Kouign-amann",
+   "Moules"
+  ],
+  "noms": [
+   "Le Gall",
+   "Le Goff",
+   "Le Bihan",
+   "Tanguy"
+  ],
+  "id": "bretagne",
+  "lat": 48.11,
+  "lon": -1.68,
+  "sud": false
+ },
+ {
+  "n": "Centre-Val de Loire",
+  "e": "🏰",
+  "g": "FR",
+  "aff": 0.75,
+  "sal": 0.93,
+  "prix": 0.95,
+  "trav": 0.9,
+  "local": 280000,
+  "zone": "Zone B",
+  "wx": "Doux",
+  "tour": "Châteaux (printemps-été)",
+  "spec": [
+   "Tarte Tatin",
+   "Rillettes de Tours"
+  ],
+  "noms": [
+   "Chevalier",
+   "Renard",
+   "Boucher"
+  ],
+  "id": "centre",
+  "lat": 47.9,
+  "lon": 1.9,
+  "sud": false
+ },
+ {
+  "n": "Corse",
+  "e": "🏝️",
+  "g": "FR",
+  "aff": 0.7,
+  "sal": 0.97,
+  "prix": 1.05,
+  "trav": 1.15,
+  "local": 380000,
+  "zone": "Zone A (Corse)",
+  "wx": "Méditerranéen chaud",
+  "tour": "Très fort été, creux hiver",
+  "spec": [
+   "Figatellu",
+   "Fiadone",
+   "Brocciu"
+  ],
+  "noms": [
+   "Santoni",
+   "Leca",
+   "Colonna",
+   "Pieri"
+  ],
+  "id": "corse",
+  "lat": 41.92,
+  "lon": 8.74,
+  "sud": false
+ },
+ {
+  "n": "Grand Est",
+  "e": "🥨",
+  "g": "FR",
+  "aff": 0.85,
+  "sal": 0.95,
+  "prix": 0.97,
+  "trav": 0.95,
+  "local": 330000,
+  "zone": "Zone B · Alsace-Moselle (+26/12, Vendredi saint)",
+  "wx": "Continental froid",
+  "tour": "Marchés de Noël (déc.)",
+  "spec": [
+   "Choucroute",
+   "Flammekueche",
+   "Quiche lorraine"
+  ],
+  "noms": [
+   "Muller",
+   "Schmitt",
+   "Meyer",
+   "Klein"
+  ],
+  "id": "grand-est",
+  "lat": 48.58,
+  "lon": 7.75,
+  "sud": false
+ },
+ {
+  "n": "Hauts-de-France",
+  "e": "🍟",
+  "g": "FR",
+  "aff": 0.85,
+  "sal": 0.93,
+  "prix": 0.92,
+  "trav": 0.92,
+  "local": 280000,
+  "zone": "Zone B",
+  "wx": "Océanique frais",
+  "tour": "Faible",
+  "spec": [
+   "Carbonade flamande",
+   "Welsh",
+   "Maroilles"
+  ],
+  "noms": [
+   "Lefebvre",
+   "Leroy",
+   "Delattre",
+   "Wattel"
+  ],
+  "id": "hauts",
+  "lat": 50.63,
+  "lon": 3.06,
+  "sud": false
+ },
+ {
+  "n": "Normandie",
+  "e": "🐄",
+  "g": "FR",
+  "aff": 0.85,
+  "sal": 0.94,
+  "prix": 0.97,
+  "trav": 0.95,
+  "local": 320000,
+  "zone": "Zone B",
+  "wx": "Océanique pluvieux",
+  "tour": "Été (plages, Mont-St-Michel)",
+  "spec": [
+   "Teurgoule",
+   "Camembert",
+   "Sole normande"
+  ],
+  "noms": [
+   "Lemoine",
+   "Hébert",
+   "Lecomte"
+  ],
+  "id": "normandie",
+  "lat": 49.18,
+  "lon": -0.37,
+  "sud": false
+ },
+ {
+  "n": "Nouvelle-Aquitaine",
+  "e": "🦆",
+  "g": "FR",
+  "aff": 0.95,
+  "sal": 0.96,
+  "prix": 1.0,
+  "trav": 0.98,
+  "local": 400000,
+  "zone": "Zone A",
+  "wx": "Océanique chaud",
+  "tour": "Fort été (côte)",
+  "spec": [
+   "Confit de canard",
+   "Cannelés",
+   "Huîtres"
+  ],
+  "noms": [
+   "Etcheverry",
+   "Dupuy",
+   "Lafitte"
+  ],
+  "id": "aquitaine",
+  "lat": 44.84,
+  "lon": -0.58,
+  "sud": false
+ },
+ {
+  "n": "Occitanie",
+  "e": "☀️",
+  "g": "FR",
+  "aff": 0.95,
+  "sal": 0.95,
+  "prix": 0.98,
+  "trav": 0.97,
+  "local": 380000,
+  "zone": "Zone C",
+  "wx": "Méditerranéen",
+  "tour": "Fort été",
+  "spec": [
+   "Cassoulet",
+   "Aligot",
+   "Brandade"
+  ],
+  "noms": [
+   "Fabre",
+   "Vidal",
+   "Roux",
+   "Marty"
+  ],
+  "id": "occitanie",
+  "lat": 43.6,
+  "lon": 1.44,
+  "sud": false
+ },
+ {
+  "n": "Pays de la Loire",
+  "e": "🌊",
+  "g": "FR",
+  "aff": 0.85,
+  "sal": 0.95,
+  "prix": 0.97,
+  "trav": 0.95,
+  "local": 330000,
+  "zone": "Zone B",
+  "wx": "Océanique doux",
+  "tour": "Été (côte)",
+  "spec": [
+   "Rillauds",
+   "Beurre blanc",
+   "Mâche nantaise"
+  ],
+  "noms": [
+   "Gautier",
+   "Brunet",
+   "Perrin"
+  ],
+  "id": "loire",
+  "lat": 47.22,
+  "lon": -1.55,
+  "sud": false
+ },
+ {
+  "n": "Provence-Alpes-Côte d'Azur",
+  "e": "🌻",
+  "g": "FR",
+  "aff": 1.2,
+  "sal": 1.02,
+  "prix": 1.12,
+  "trav": 1.1,
+  "local": 800000,
+  "zone": "Zone B",
+  "wx": "Méditerranéen ensoleillé",
+  "tour": "Très fort été",
+  "spec": [
+   "Bouillabaisse",
+   "Ratatouille",
+   "Socca"
+  ],
+  "noms": [
+   "Giraud",
+   "Blanc",
+   "Martini",
+   "Olivier"
+  ],
+  "id": "provence",
+  "lat": 43.3,
+  "lon": 5.37,
+  "sud": false
+ },
+ {
+  "n": "Guadeloupe",
+  "e": "🌴",
+  "g": "DOM",
+  "aff": 0.8,
+  "sal": 0.98,
+  "prix": 1.15,
+  "trav": 1.3,
+  "local": 330000,
+  "zone": "Calendrier Guadeloupe · 27/05 abolition",
+  "wx": "Tropical, cyclones août-oct",
+  "tour": "Saison sèche déc.-avr.",
+  "spec": [
+   "Colombo de poulet",
+   "Accras",
+   "Bokit"
+  ],
+  "noms": [
+   "Lubin",
+   "Jean-Baptiste",
+   "Célestin"
+  ],
+  "id": "guadeloupe",
+  "lat": 16.24,
+  "lon": -61.53,
+  "sud": false
+ },
+ {
+  "n": "Martinique",
+  "e": "🌺",
+  "g": "DOM",
+  "aff": 0.8,
+  "sal": 0.98,
+  "prix": 1.15,
+  "trav": 1.3,
+  "local": 340000,
+  "zone": "Calendrier Martinique · 22/05 abolition",
+  "wx": "Tropical, cyclones",
+  "tour": "Déc.-avr.",
+  "spec": [
+   "Féroce d'avocat",
+   "Blaff",
+   "Ti-punch"
+  ],
+  "noms": [
+   "Rosier",
+   "Dorval",
+   "Théodose"
+  ],
+  "id": "martinique",
+  "lat": 14.61,
+  "lon": -61.07,
+  "sud": false
+ },
+ {
+  "n": "Guyane",
+  "e": "🦜",
+  "g": "DOM",
+  "aff": 0.55,
+  "sal": 0.97,
+  "prix": 1.18,
+  "trav": 1.4,
+  "local": 220000,
+  "zone": "Calendrier Guyane · 10/06",
+  "wx": "Équatorial pluvieux",
+  "tour": "Très faible",
+  "spec": [
+   "Bouillon d'awara",
+   "Couac"
+  ],
+  "noms": [
+   "Pierre-Louis",
+   "Atticot",
+   "Ho-A-Chuck"
+  ],
+  "id": "guyane",
+  "lat": 4.94,
+  "lon": -52.33,
+  "sud": false
+ },
+ {
+  "n": "La Réunion",
+  "e": "🌋",
+  "g": "DOM",
+  "aff": 0.85,
+  "sal": 0.97,
+  "prix": 1.12,
+  "trav": 1.3,
+  "local": 320000,
+  "zone": "Calendrier Réunion · 20/12 Fèt Kaf (été austral)",
+  "wx": "Tropical, saisons inversées",
+  "tour": "Juil.-août + déc.",
+  "spec": [
+   "Rougail saucisse",
+   "Cari",
+   "Samoussas"
+  ],
+  "noms": [
+   "Payet",
+   "Hoarau",
+   "Grondin",
+   "Técher"
+  ],
+  "id": "reunion",
+  "lat": -20.88,
+  "lon": 55.45,
+  "sud": true
+ },
+ {
+  "n": "Mayotte",
+  "e": "🐢",
+  "g": "DOM",
+  "aff": 0.5,
+  "sal": 0.9,
+  "prix": 1.1,
+  "trav": 1.45,
+  "local": 180000,
+  "zone": "Calendrier Mayotte · 27/04",
+  "wx": "Tropical",
+  "tour": "Très faible",
+  "spec": [
+   "Mataba",
+   "Brochettes-manioc"
+  ],
+  "noms": [
+   "Abdallah",
+   "Madi",
+   "Soilihi"
+  ],
+  "id": "mayotte",
+  "lat": -12.78,
+  "lon": 45.23,
+  "sud": true
+ },
+ {
+  "n": "Polynésie française",
+  "e": "🌊",
+  "g": "DOM",
+  "aff": 0.7,
+  "sal": 1.1,
+  "prix": 1.35,
+  "trav": 1.5,
+  "local": 500000,
+  "zone": "Calendrier Polynésie · 29/06 autonomie",
+  "wx": "Tropical, saisons inversées",
+  "tour": "Fort (lunes de miel), pic juil.-août",
+  "spec": [
+   "Poisson cru au lait de coco",
+   "Firi firi"
+  ],
+  "noms": [
+   "Teriitehau",
+   "Tetuanui",
+   "Bambridge"
+  ],
+  "id": "polynesie",
+  "lat": -17.55,
+  "lon": -149.56,
+  "sud": true
+ },
+ {
+  "n": "Nouvelle-Calédonie",
+  "e": "🦎",
+  "g": "DOM",
+  "aff": 0.65,
+  "sal": 1.08,
+  "prix": 1.3,
+  "trav": 1.45,
+  "local": 450000,
+  "zone": "Calendrier NC · 24/09",
+  "wx": "Tropical tempéré, inversé",
+  "tour": "Moyen",
+  "spec": [
+   "Bougna",
+   "Cerf en civet"
+  ],
+  "noms": [
+   "Wamytan",
+   "Gope",
+   "Tjibaou"
+  ],
+  "id": "caledonie",
+  "lat": -22.27,
+  "lon": 166.45,
+  "sud": true
+ },
+ {
+  "n": "Londres",
+  "e": "🇬🇧",
+  "g": "WD",
+  "aff": 1.4,
+  "sal": 1.3,
+  "prix": 1.3,
+  "trav": 1.4,
+  "local": 2200000,
+  "zone": "Royaume-Uni · bank holidays",
+  "wx": "Océanique gris",
+  "tour": "Toute l'année",
+  "spec": [
+   "Fish & chips",
+   "Sunday roast",
+   "Scones"
+  ],
+  "noms": [
+   "Smith",
+   "Jones",
+   "Taylor",
+   "Brown"
+  ],
+  "id": "londres",
+  "lat": 51.51,
+  "lon": -0.13,
+  "sud": false
+ },
+ {
+  "n": "Berlin",
+  "e": "🇩🇪",
+  "g": "WD",
+  "aff": 1.15,
+  "sal": 1.05,
+  "prix": 1.0,
+  "trav": 1.05,
+  "local": 900000,
+  "zone": "Allemagne · 3/10 Unité",
+  "wx": "Continental froid",
+  "tour": "Été + Noël",
+  "spec": [
+   "Currywurst",
+   "Eisbein",
+   "Bretzel"
+  ],
+  "noms": [
+   "Müller",
+   "Schmidt",
+   "Fischer"
+  ],
+  "id": "berlin",
+  "lat": 52.52,
+  "lon": 13.4,
+  "sud": false
+ },
+ {
+  "n": "Madrid",
+  "e": "🇪🇸",
+  "g": "WD",
+  "aff": 1.15,
+  "sal": 0.85,
+  "prix": 0.95,
+  "trav": 0.95,
+  "local": 800000,
+  "zone": "Espagne · 12/10 Hispanité",
+  "wx": "Chaud et sec",
+  "tour": "Printemps-automne",
+  "spec": [
+   "Cocido",
+   "Tortilla",
+   "Churros"
+  ],
+  "noms": [
+   "García",
+   "López",
+   "Martínez"
+  ],
+  "id": "madrid",
+  "lat": 40.42,
+  "lon": -3.7,
+  "sud": false
+ },
+ {
+  "n": "Rome",
+  "e": "🇮🇹",
+  "g": "WD",
+  "aff": 1.25,
+  "sal": 0.9,
+  "prix": 1.0,
+  "trav": 1.05,
+  "local": 1000000,
+  "zone": "Italie · Ferragosto 15/08",
+  "wx": "Méditerranéen",
+  "tour": "Très fort",
+  "spec": [
+   "Carbonara",
+   "Supplì",
+   "Tiramisu"
+  ],
+  "noms": [
+   "Rossi",
+   "Russo",
+   "Bianchi"
+  ],
+  "id": "rome",
+  "lat": 41.9,
+  "lon": 12.5,
+  "sud": false
+ },
+ {
+  "n": "Lisbonne",
+  "e": "🇵🇹",
+  "g": "WD",
+  "aff": 1.1,
+  "sal": 0.7,
+  "prix": 0.85,
+  "trav": 0.85,
+  "local": 600000,
+  "zone": "Portugal · 13/06 St-Antoine",
+  "wx": "Doux ensoleillé",
+  "tour": "Fort été",
+  "spec": [
+   "Bacalhau à brás",
+   "Pastel de nata"
+  ],
+  "noms": [
+   "Silva",
+   "Santos",
+   "Ferreira"
+  ],
+  "id": "lisbonne",
+  "lat": 38.72,
+  "lon": -9.14,
+  "sud": false
+ },
+ {
+  "n": "Bruxelles",
+  "e": "🇧🇪",
+  "g": "WD",
+  "aff": 1.05,
+  "sal": 1.08,
+  "prix": 1.02,
+  "trav": 1.05,
+  "local": 700000,
+  "zone": "Belgique · 21/07",
+  "wx": "Océanique pluvieux",
+  "tour": "Moyen",
+  "spec": [
+   "Moules-frites",
+   "Gaufre",
+   "Carbonnade"
+  ],
+  "noms": [
+   "Peeters",
+   "Janssens",
+   "Maes"
+  ],
+  "id": "bruxelles",
+  "lat": 50.85,
+  "lon": 4.35,
+  "sud": false
+ },
+ {
+  "n": "Amsterdam",
+  "e": "🇳🇱",
+  "g": "WD",
+  "aff": 1.2,
+  "sal": 1.12,
+  "prix": 1.1,
+  "trav": 1.15,
+  "local": 1100000,
+  "zone": "Pays-Bas · 27/04 Koningsdag",
+  "wx": "Océanique venteux",
+  "tour": "Fort printemps (tulipes)",
+  "spec": [
+   "Bitterballen",
+   "Stamppot",
+   "Stroopwafel"
+  ],
+  "noms": [
+   "De Jong",
+   "Jansen",
+   "Visser"
+  ],
+  "id": "amsterdam",
+  "lat": 52.37,
+  "lon": 4.9,
+  "sud": false
+ },
+ {
+  "n": "Vienne",
+  "e": "🇦🇹",
+  "g": "WD",
+  "aff": 1.05,
+  "sal": 1.05,
+  "prix": 1.05,
+  "trav": 1.05,
+  "local": 800000,
+  "zone": "Autriche",
+  "wx": "Continental",
+  "tour": "Noël + été",
+  "spec": [
+   "Wiener Schnitzel",
+   "Sachertorte"
+  ],
+  "noms": [
+   "Gruber",
+   "Huber",
+   "Wagner"
+  ],
+  "id": "vienne",
+  "lat": 48.21,
+  "lon": 16.37,
+  "sud": false
+ },
+ {
+  "n": "Athènes",
+  "e": "🇬🇷",
+  "g": "WD",
+  "aff": 1.0,
+  "sal": 0.65,
+  "prix": 0.85,
+  "trav": 0.85,
+  "local": 450000,
+  "zone": "Grèce · Pâques orthodoxe",
+  "wx": "Chaud et sec",
+  "tour": "Très fort été",
+  "spec": [
+   "Moussaka",
+   "Souvlaki",
+   "Baklava"
+  ],
+  "noms": [
+   "Papadopoulos",
+   "Nikolaou"
+  ],
+  "id": "athenes",
+  "lat": 37.98,
+  "lon": 23.73,
+  "sud": false
+ },
+ {
+  "n": "Moscou",
+  "e": "🇷🇺",
+  "g": "WD",
+  "aff": 1.05,
+  "sal": 0.7,
+  "prix": 0.95,
+  "trav": 0.95,
+  "local": 700000,
+  "zone": "Russie · Noël 7/01",
+  "wx": "Continental très froid",
+  "tour": "Faible hiver",
+  "spec": [
+   "Bortsch",
+   "Blinis",
+   "Pelmeni"
+  ],
+  "noms": [
+   "Ivanov",
+   "Petrov",
+   "Smirnov"
+  ],
+  "id": "moscou",
+  "lat": 55.75,
+  "lon": 37.62,
+  "sud": false
+ },
+ {
+  "n": "New York",
+  "e": "🇺🇸",
+  "g": "WD",
+  "aff": 1.5,
+  "sal": 1.35,
+  "prix": 1.4,
+  "trav": 1.45,
+  "local": 2500000,
+  "zone": "États-Unis · Thanksgiving, 4/07",
+  "wx": "Continental contrasté",
+  "tour": "Toute l'année",
+  "spec": [
+   "Burger",
+   "Cheesecake",
+   "Bagel"
+  ],
+  "noms": [
+   "Johnson",
+   "Williams",
+   "Miller"
+  ],
+  "id": "new-york",
+  "lat": 40.71,
+  "lon": -74,
+  "sud": false
+ },
+ {
+  "n": "Washington",
+  "e": "🇺🇸",
+  "g": "WD",
+  "aff": 1.1,
+  "sal": 1.25,
+  "prix": 1.25,
+  "trav": 1.3,
+  "local": 1400000,
+  "zone": "États-Unis",
+  "wx": "Humide",
+  "tour": "Printemps (cerisiers)",
+  "spec": [
+   "Crab cakes",
+   "Half-smoke"
+  ],
+  "noms": [
+   "Davis",
+   "Wilson",
+   "Anderson"
+  ],
+  "id": "washington",
+  "lat": 38.91,
+  "lon": -77.04,
+  "sud": false
+ },
+ {
+  "n": "Ottawa",
+  "e": "🇨🇦",
+  "g": "WD",
+  "aff": 0.85,
+  "sal": 1.1,
+  "prix": 1.1,
+  "trav": 1.15,
+  "local": 700000,
+  "zone": "Canada · 1/07",
+  "wx": "Hiver très froid",
+  "tour": "Faible",
+  "spec": [
+   "Poutine",
+   "Queues de castor"
+  ],
+  "noms": [
+   "Tremblay",
+   "Gagnon",
+   "Roy"
+  ],
+  "id": "ottawa",
+  "lat": 45.42,
+  "lon": -75.7,
+  "sud": false
+ },
+ {
+  "n": "Mexico",
+  "e": "🇲🇽",
+  "g": "WD",
+  "aff": 1.2,
+  "sal": 0.45,
+  "prix": 0.7,
+  "trav": 0.75,
+  "local": 500000,
+  "zone": "Mexique · 16/09, Día de Muertos",
+  "wx": "Tempéré d'altitude",
+  "tour": "Moyen",
+  "spec": [
+   "Tacos al pastor",
+   "Mole",
+   "Churros"
+  ],
+  "noms": [
+   "Hernández",
+   "González",
+   "Pérez"
+  ],
+  "id": "mexico",
+  "lat": 19.43,
+  "lon": -99.13,
+  "sud": false
+ },
+ {
+  "n": "Buenos Aires",
+  "e": "🇦🇷",
+  "g": "WD",
+  "aff": 1.1,
+  "sal": 0.5,
+  "prix": 0.75,
+  "trav": 0.8,
+  "local": 450000,
+  "zone": "Argentine · saisons inversées",
+  "wx": "Tempéré, inversé",
+  "tour": "Moyen",
+  "spec": [
+   "Asado",
+   "Empanadas",
+   "Dulce de leche"
+  ],
+  "noms": [
+   "Fernández",
+   "Rodríguez",
+   "Gómez"
+  ],
+  "id": "buenos-aires",
+  "lat": -34.6,
+  "lon": -58.38,
+  "sud": true
+ },
+ {
+  "n": "Brasilia",
+  "e": "🇧🇷",
+  "g": "WD",
+  "aff": 0.7,
+  "sal": 0.5,
+  "prix": 0.75,
+  "trav": 0.8,
+  "local": 350000,
+  "zone": "Brésil · Carnaval",
+  "wx": "Tropical",
+  "tour": "Faible",
+  "spec": [
+   "Feijoada",
+   "Pão de queijo"
+  ],
+  "noms": [
+   "Silva",
+   "Souza",
+   "Oliveira"
+  ],
+  "id": "brasilia",
+  "lat": -15.79,
+  "lon": -47.88,
+  "sud": true
+ },
+ {
+  "n": "Le Caire",
+  "e": "🇪🇬",
+  "g": "WD",
+  "aff": 1.1,
+  "sal": 0.35,
+  "prix": 0.6,
+  "trav": 0.65,
+  "local": 250000,
+  "zone": "Égypte · Ramadan/Aïd",
+  "wx": "Désertique",
+  "tour": "Hiver",
+  "spec": [
+   "Koshari",
+   "Ful medames"
+  ],
+  "noms": [
+   "Mohamed",
+   "Hassan",
+   "Ibrahim"
+  ],
+  "id": "caire",
+  "lat": 30.04,
+  "lon": 31.24,
+  "sud": false
+ },
+ {
+  "n": "Dakar",
+  "e": "🇸🇳",
+  "g": "WD",
+  "aff": 0.85,
+  "sal": 0.35,
+  "prix": 0.6,
+  "trav": 0.7,
+  "local": 220000,
+  "zone": "Sénégal · Tabaski",
+  "wx": "Tropical sec",
+  "tour": "Hiver",
+  "spec": [
+   "Thiéboudienne",
+   "Yassa",
+   "Mafé"
+  ],
+  "noms": [
+   "Diop",
+   "Ndiaye",
+   "Fall",
+   "Sow"
+  ],
+  "id": "dakar",
+  "lat": 14.69,
+  "lon": -17.45,
+  "sud": false
+ },
+ {
+  "n": "Tokyo",
+  "e": "🇯🇵",
+  "g": "WD",
+  "aff": 1.45,
+  "sal": 1.1,
+  "prix": 1.25,
+  "trav": 1.35,
+  "local": 2000000,
+  "zone": "Japon · Golden Week",
+  "wx": "Tempéré humide",
+  "tour": "Printemps (sakura)",
+  "spec": [
+   "Ramen",
+   "Tonkatsu",
+   "Mochi"
+  ],
+  "noms": [
+   "Sato",
+   "Suzuki",
+   "Takahashi"
+  ],
+  "id": "tokyo",
+  "lat": 35.68,
+  "lon": 139.69,
+  "sud": false
+ },
+ {
+  "n": "Pékin",
+  "e": "🇨🇳",
+  "g": "WD",
+  "aff": 1.3,
+  "sal": 0.6,
+  "prix": 0.8,
+  "trav": 0.85,
+  "local": 900000,
+  "zone": "Chine · Nouvel An lunaire",
+  "wx": "Continental sec",
+  "tour": "Moyen",
+  "spec": [
+   "Canard laqué",
+   "Jiaozi"
+  ],
+  "noms": [
+   "Wang",
+   "Li",
+   "Zhang"
+  ],
+  "id": "pekin",
+  "lat": 39.9,
+  "lon": 116.4,
+  "sud": false
+ },
+ {
+  "n": "Séoul",
+  "e": "🇰🇷",
+  "g": "WD",
+  "aff": 1.25,
+  "sal": 0.9,
+  "prix": 1.05,
+  "trav": 1.05,
+  "local": 1100000,
+  "zone": "Corée · Chuseok",
+  "wx": "Continental",
+  "tour": "Moyen",
+  "spec": [
+   "Bibimbap",
+   "Bulgogi",
+   "Kimchi"
+  ],
+  "noms": [
+   "Kim",
+   "Lee",
+   "Park"
+  ],
+  "id": "seoul",
+  "lat": 37.57,
+  "lon": 126.98,
+  "sud": false
+ },
+ {
+  "n": "Bangkok",
+  "e": "🇹🇭",
+  "g": "WD",
+  "aff": 1.25,
+  "sal": 0.4,
+  "prix": 0.65,
+  "trav": 0.7,
+  "local": 400000,
+  "zone": "Thaïlande · Songkran",
+  "wx": "Tropical",
+  "tour": "Fort nov.-mars",
+  "spec": [
+   "Pad thaï",
+   "Tom yum",
+   "Mango sticky rice"
+  ],
+  "noms": [
+   "Saetang",
+   "Srisuk",
+   "Wongsa"
+  ],
+  "id": "bangkok",
+  "lat": 13.76,
+  "lon": 100.5,
+  "sud": false
+ },
+ {
+  "n": "Canberra",
+  "e": "🇦🇺",
+  "g": "WD",
+  "aff": 0.6,
+  "sal": 1.2,
+  "prix": 1.2,
+  "trav": 1.25,
+  "local": 600000,
+  "zone": "Australie · inversé",
+  "wx": "Tempéré, inversé",
+  "tour": "Faible",
+  "spec": [
+   "Meat pie",
+   "Pavlova"
+  ],
+  "noms": [
+   "Smith",
+   "Nguyen",
+   "Walker"
+  ],
+  "id": "canberra",
+  "lat": -35.28,
+  "lon": 149.13,
+  "sud": true
+ }
+];
+
+/* ===== v9.6 part b ===== */
+/* v9.6 — paramètres régionaux, cuisine et réassort sans rupture. */
+const v96Lieu=(s=S)=>LIEUX.find(l=>l.id===(s&&s.v96loc))||LIEUX[0];
+const v96Coef=k=>v96Lieu()[k]/LIEUX[0][k];
+const v96Esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const v96SizeFactor=[.55,1,1.6];
+function v96Value(l=v96Lieu(),s=S){ return Math.round(l.local*v96SizeFactor[clamp(s&&s.plan?s.plan.pid:1,0,2)]); }
+/* Recettes représentatives, exprimées dans les familles d'ingrédients du jeu. */
+const V96REC=[
+ ['e:oignon,fromage,pain','p:pain,jambon,fromage','d:epicerie,creme'],
+ ['e:fromage,pain','e:legumes,creme'],['p:patate,fromage,jambon,creme','p:feculents,poisson,creme','e:fromage,pain'],
+ ['p:paleron,patate,vin,oignon','e:creme,vin,oignon','e:fromage,pain'],
+ ['p:epicerie,creme,jambon,fromage','d:epicerie,creme','p:poisson,creme,oignon'],
+ ['d:pomme,epicerie,creme','e:jambon,pain'],['p:jambon,epicerie','d:fromage,creme,epicerie','e:fromage,pain'],
+ ['p:jambon,legumes,patate','p:epicerie,creme,oignon,jambon','e:creme,jambon,epicerie'],
+ ['p:paleron,biere,oignon','p:pain,fromage,biere','e:fromage,pain'],['d:feculents,creme,epicerie','e:fromage,pain','p:poisson,creme,patate'],
+ ['p:volaille,patate','d:creme,epicerie','e:poisson,pain'],['p:jambon,feculents,volaille','p:patate,fromage,creme','p:poisson,patate,creme'],
+ ['p:jambon,patate','p:poisson,creme,feculents','e:legumes'],['p:poisson,legumes,oignon','p:legumes,oignon','e:epicerie,legumes'],
+ ['p:volaille,feculents,legumes','e:poisson,epicerie','p:pain,volaille,legumes'],
+ ['e:legumes,poisson','p:poisson,legumes','b:spirit,fruits'],['p:paleron,legumes','p:feculents'],
+ ['p:jambon,legumes,feculents','p:volaille,feculents','e:epicerie,volaille,legumes'],
+ ['p:legumes,creme','p:boeuf,feculents'],['p:poisson,creme,fruits','d:epicerie,creme'],['p:volaille,legumes,feculents','p:paleron,vin'],
+ ['p:poisson,patate,epicerie','p:boeuf,patate,legumes','d:epicerie,creme'],['p:jambon,epicerie','p:jambon,legumes','e:epicerie'],
+ ['p:paleron,legumes,feculents','p:patate,creme','d:epicerie,creme'],['p:feculents,jambon,creme','e:feculents,fromage','d:creme,cafe,epicerie'],
+ ['p:poisson,patate,creme','d:epicerie,creme'],['p:poisson,patate','d:epicerie,creme','p:paleron,biere'],
+ ['e:boeuf,epicerie','p:patate,legumes,jambon','d:epicerie,creme'],['p:veau,epicerie,patate','d:chocolat,epicerie,creme'],
+ ['p:boeuf,legumes,creme','p:jambon,pain','d:epicerie,fruits'],['e:legumes,creme','e:epicerie,creme','p:paleron,epicerie'],
+ ['p:boeuf,pain,fromage','d:fromage,creme,epicerie','e:pain,fromage'],['p:poisson,epicerie','p:jambon,pain'],['p:patate,fromage','d:epicerie,creme'],
+ ['p:jambon,epicerie,legumes','p:volaille,chocolat','d:epicerie,creme'],['p:boeuf,legumes','e:epicerie,boeuf','d:creme,epicerie'],
+ ['p:jambon,feculents','e:epicerie,fromage'],['p:feculents,legumes','e:legumes,pain'],['p:poisson,feculents,legumes','p:volaille,oignon','p:boeuf,legumes'],
+ ['p:feculents,jambon,creme','p:jambon,epicerie','d:feculents,epicerie'],['p:volaille,legumes','e:epicerie,jambon,legumes'],
+ ['p:feculents,legumes,creme','p:boeuf,oignon','e:legumes'],['p:feculents,poisson,creme','e:poisson,legumes','d:feculents,fruits,creme'],['p:boeuf,epicerie','d:creme,epicerie,fruits']
+];
+LIEUX.forEach((l,li)=>{ l.ids=[]; l.spec.forEach((n,j)=>{
+ const id='loc_'+li+'_'+j, a=V96REC[li][j].split(':'), cat={e:'entree',p:'plat',d:'dessert',b:'boisson'}[a[0]], rec={}; a[1].split(',').forEach(i=>rec[i]=(rec[i]||0)+1);
+ const al=[]; if(rec.epicerie||rec.pain||rec.feculents) al.push('gluten'); if(rec.creme) al.push('oeufs','lait'); else if(rec.fromage) al.push('lait'); if(rec.poisson) al.push('poissons'); if(rec.vin) al.push('sulfites');
+ DISH[id]={n,e:l.e,cat,ref:cat==='plat'?18:cat==='boisson'?6:8,prep:cat==='plat'?4:cat==='boisson'?0:2,q:3.8,pop:1,rec,al,veg:!Object.keys(rec).some(i=>ING[i].meat),gf:!al.includes('gluten'),v96local:l.id};
+ if(cat==='boisson') DISH[id].bar=.5; l.ids.push(id);
+ }); });
+/* Getters évitent tout cumul de coefficients après chargement/déménagement. */
+Object.getOwnPropertyNames(DISH).map(id=>DISH[id]).forEach(d=>{ const base=d.ref; Object.defineProperty(d,'ref',{get(){return Math.round(base*v96Coef('prix')*10)/10;},configurable:true}); });
+for(const [list,k] of [[Object.values(UPGS),'c'],[Object.values(PITEM),'cost'],[Object.values(DECOR),'c'],[Object.values(EQUIP),'c']]) for(const o of list){ if(typeof o[k]!=='number') continue; const base=o[k]; Object.defineProperty(o,k,{get(){return Math.round(base*v96Coef('trav'));},configurable:true}); }
+{const f=xPrice; xPrice=function(){return Math.round(f.apply(this,arguments)*v96Coef('trav'));};}
+{const f=fairWage; fairWage=function(){return Math.round(f.apply(this,arguments)*v96Coef('sal'));};}
+v9Rent=function(){return 0;};
+fixedCosts=function(){return v9Total()?0:v9Utilities();};
+{const f=dishLocked; dishLocked=function(id){const d=DISH[id]; if(d&&d.v96local) return d.v96local!==v96Lieu().id; return f(id);};}
+function v96Specials(s=S,enable=true){
+ const l=v96Lieu(s); if(typeof DR_TYPES!=='undefined'){DR_TYPES.alc.ids=DR_TYPES.alc.ids.filter(id=>!DISH[id].v96local);DR_TYPES.alc.ids.push(...l.ids.filter(id=>DISH[id].cat==='boisson'));} for(const [id,d] of Object.entries(DISH)){ if(!s.menu[id]) s.menu[id]={on:false,price:d.ref}; if(d.v96local){if(d.v96local!==l.id)s.menu[id].on=false; else if(enable)s.menu[id].on=true;} }
+}
+function v96Tour(l=v96Lieu(),d=dayNum()){
+ const m=ymd(d).m+1, t=l.tour.toLowerCase();
+ if(t.includes('très faible')||t==='faible')return 1;
+ let pic=[];
+ if(/hiver|sèche|déc.-avr|nov.-mars/.test(t))pic.push(12,1,2,3);
+ if(/été|juil|côte|plage/.test(t))pic.push(6,7,8);
+ if(/printemps|sakura|tulipe|ceris/.test(t))pic.push(3,4,5);
+ if(/automne/.test(t))pic.push(9,10); if(/vendange/.test(t))pic.push(9);if(/noël|déc\./.test(t))pic.push(12);
+ if(l.sud&&l.g==='WD'&&pic.length)pic=pic.map(x=>(x+5)%12+1);
+ return pic.includes(m)?1.35:/toute l'année|très fort/.test(t)?1.15:1.05;
+}
+function v96Demand(d=dayNum()){return v96Coef('aff')*v96Tour(v96Lieu(),d)/v96Tour(LIEUX[0],d);}
+{const f=demandMult; demandMult=function(){return f()*v96Demand();};}
+{const f=fcF; fcF=function(d){return f(d)*v96Demand(d);};}
+const v96OriginalMonth=calMonth; calMonth=function(d){return (v96OriginalMonth(d)+(v96Lieu().sud?6:0))%12;};
+{const f=weatherOf; weatherOf=function(d){
+ const l=v96Lieu(); if(l.id==='paris'||l.id==='idf')return f(d);
+ const m=(ymd(d).m+(l.sud?6:0))%12, h=((Math.imul(serD(d)+LIEUX.indexOf(l)*991,2654435761)>>>0)%1000)/1000, text=l.wx.toLowerCase();
+ let temp=WX_T[m], rain=.28,sun=.4;
+ if(/tropical|équatorial/.test(text)){temp=[28,28,28,27,26,25,24,24,25,26,27,28][m];rain=[.5,.5,.4,.3,.2,.15,.15,.15,.2,.3,.4,.5][m];sun=.3;}
+ else if(/désert/.test(text)){temp=[14,16,20,25,29,32,34,34,30,26,20,15][m];rain=.02;sun=.85;}
+ else if(/méditerranéen|chaud et sec|ensoleillé/.test(text)){temp+=4;rain=m>4&&m<9?.08:.25;sun=.65;}
+ else if(/continental|très froid|hiver très/.test(text)){temp=[-3,-1,4,10,16,21,24,23,18,11,4,0][m];if(/très froid/.test(text))temp-=5;rain=.22;sun=.4;}
+ else if(/pluvieux|gris|humide|frais/.test(text)){temp-=2;rain=.42;sun=.22;}
+ if(l.id==='mexico')temp=19;const k=h<rain?'rain':h<rain+sun?'sun':'cloud';temp+=Math.floor(h*7)-3;
+ if(k==='rain'&&temp<=1)return {k,t:temp,e:'🌨️',n:'neigeux',m:WX[k].m};
+ return {k,t:temp,e:WX[k].e,n:WX[k].n,m:WX[k].m};
+};}
+const V96FN={londres:['Oliver','Amelia','George','Isla'],berlin:['Lukas','Hannah','Felix','Mia'],madrid:['Lucía','Mateo','Pablo','Sofía'],rome:['Giulia','Marco','Luca','Sofia'],lisbonne:['João','Maria','Pedro','Inês'],bruxelles:['Emma','Louis','Noor','Lucas'],amsterdam:['Daan','Sophie','Bram','Eva'],vienne:['Lukas','Anna','Felix','Lena'],athenes:['Nikos','Eleni','Yannis','Maria'],moscou:['Ivan','Anna','Dmitri','Olga'],'new-york':['James','Olivia','Noah','Emma'],washington:['William','Ava','Elijah','Mia'],ottawa:['Liam','Alice','Émile','Charlotte'],mexico:['Diego','Valentina','José','Camila'],'buenos-aires':['Santiago','Martina','Juan','Lucía'],brasilia:['João','Ana','Gabriel','Julia'],caire:['Omar','Fatima','Ahmed','Nour'],dakar:['Moussa','Aminata','Ibrahima','Awa'],tokyo:['Haruto','Yui','Ren','Sakura'],pekin:['Wei','Fang','Jun','Mei'],seoul:['Min-jun','Seo-yeon','Ji-ho','Ji-woo'],bangkok:['Somchai','Mali','Arthit','Suda'],canberra:['Oliver','Charlotte','Jack','Amelia'],mayotte:['Ali','Amina','Ibrahim','Fatima'],polynesie:['Moana','Teva','Mahana','Hina'],caledonie:['Kévin','Mélina','Jean','Léna']};
+const V96FRFN=FN.slice();
+function v96Names(){const l=v96Lieu();FN.splice(0,FN.length,...(V96FN[l.id]||V96FRFN));LN.splice(0,LN.length,...l.noms);RES_NAMES.splice(0,RES_NAMES.length,...l.noms);}
+/* Réassort contractuel instantané de dernier recours, facturé et tracé.
+   Les prévisions et commandes classiques restent actives ; aucune unité gratuite. */
+function v96Supply(rec,mult=1){
+ if(!S||S.pw&&S.pw.j0||dayNum()<6||worksNow()||closedNow())return;
+ let bill=0,qty=0;for(const i in rec){const st=S.stock[i];if(!st||!ING[i])continue;const need=Math.max(0,Math.ceil(rec[i]*mult-st.q));if(!need)continue;
+ const unit=ING[i].p*infl(i)*1.18, total=st.q+need;st.cost=(st.q*st.cost+need*unit)/total;st.q=total;lotAdd(i,need,'marche');bill+=unit*need;qty+=need;
+ }
+ if(bill){S.cash-=bill;S.day.purch=(S.day.purch||0)+bill;S.day.v96express=(S.day.v96express||0)+bill;S.day.v96units=(S.day.v96units||0)+qty;}
+}
+for(const name of ['dishAvail','dishPortions','takeDish']){
+ // wrappers explicites ci-dessous, afin de ne pas dépendre d'eval.
+}
+{const f=dishAvail; dishAvail=function(id){if(DISH[id]&&S.menu[id]&&S.menu[id].on&&!dishLocked(id))v96Supply(DISH[id].rec,2);return f(id);};}
+{const f=dishPortions; dishPortions=function(id){if(DISH[id]&&S.menu[id]&&S.menu[id].on&&!dishLocked(id))v96Supply(DISH[id].rec,2);return f(id);};}
+{const f=takeDish; takeDish=function(id,o){if(DISH[id])v96Supply(DISH[id].rec,1);return f(id,o);};}
+{const f=mdjGen; mdjGen=function(){if(S&&S.mdj)for(const id of [S.mdj.e,S.mdj.p,S.mdj.d])if(DISH[id])v96Supply(DISH[id].rec,60);return f.apply(this,arguments);};}
+
+{const f=libFood;libFood=function(){return f().filter(id=>!DISH[id].v96local||DISH[id].v96local===v96Lieu().id);};}
+{const f=dishCard;dishCard=function(id){if(DISH[id].v96local&&DISH[id].v96local!==v96Lieu().id)return '';return f.apply(this,arguments);};}
+
+{const f=calTouristP;calTouristP=function(){if(S&&S.v96legacy&&v96Lieu().id==='paris')return f();const t=v96Tour(),l=v96Lieu();return clamp(f()+Math.max(0,t-1)*.4+(/toute l'année|très fort/i.test(l.tour)?.04:0),0,.35);};}
+
+/* ===== v9.6 part c ===== */
+/* v9.6 — calendriers locaux et persistance des cinq parties. */
+const V96HOL={
+ guadeloupe:['05-27:Abolition de l’esclavage'],martinique:['05-22:Abolition de l’esclavage'],guyane:['06-10:Abolition de l’esclavage'],reunion:['12-20:Fèt Kaf'],mayotte:['04-27:Abolition de l’esclavage'],polynesie:['06-29:Fête de l’autonomie'],caledonie:['09-24:Fête de la citoyenneté'],
+ londres:['12-26:Boxing Day'],berlin:['05-01:Fête du Travail','10-03:Unité allemande','12-26:Saint-Étienne'],madrid:['01-06:Épiphanie','10-12:Fête nationale','12-06:Constitution'],rome:['04-25:Libération','06-02:Fête de la République','08-15:Ferragosto'],lisbonne:['04-25:Liberté','06-10:Fête nationale','06-13:Saint-Antoine'],bruxelles:['05-01:Fête du Travail','07-21:Fête nationale','11-11:Armistice'],amsterdam:['04-27:Fête du Roi','05-05:Libération','12-26:Deuxième jour de Noël'],vienne:['05-01:Fête du Travail','10-26:Fête nationale','12-26:Saint-Étienne'],athenes:['03-25:Fête nationale','08-15:Assomption','10-28:Jour du Non'],moscou:['01-07:Noël orthodoxe','05-09:Jour de la Victoire','06-12:Fête nationale'],
+ 'new-york':['07-04:Indépendance','11-11:Veterans Day'],washington:['07-04:Indépendance','11-11:Veterans Day'],ottawa:['07-01:Fête du Canada','11-11:Souvenir'],mexico:['09-16:Indépendance','11-02:Jour des morts'],'buenos-aires':['05-25:Révolution de Mai','07-09:Indépendance'],brasilia:['04-21:Tiradentes','09-07:Indépendance'],caire:['04-25:Libération du Sinaï','07-23:Révolution'],dakar:['04-04:Indépendance','05-01:Fête du Travail'],tokyo:['02-11:Fondation du Japon','02-23:Anniversaire de l’Empereur','04-29:Shōwa','05-03:Constitution','05-04:Nature','05-05:Enfants','11-03:Culture'],pekin:['05-01:Fête du Travail','10-01:Fête nationale','10-02:Semaine d’or','10-03:Semaine d’or'],seoul:['03-01:Mouvement d’Indépendance','05-05:Enfants','08-15:Libération','10-03:Fondation nationale','10-09:Hangeul'],bangkok:['04-13:Songkran','04-14:Songkran','04-15:Songkran','12-05:Fête nationale'],canberra:['01-26:Australia Day','04-25:Anzac Day','12-26:Boxing Day']
+};
+const v96FRGet=FER.get.bind(FER),v96FTGet=FET.get.bind(FET),v96Vac=vacOn;
+function v96Holiday(sr){
+ const l=v96Lieu(), x=ymdS(sr);calYear(x.y);
+ if(l.g==='FR'||l.g==='DOM'){
+  const a=v96FRGet(sr);if(a)return a;
+  if(l.id==='grand-est'&&(sr===easterSer(x.y)-2||x.m===11&&x.dd===26))return {n:x.m===11?'Saint-Étienne':'Vendredi saint',k:'local'};
+ }
+ const key=String(x.m+1).padStart(2,'0')+'-'+String(x.dd).padStart(2,'0'), rows=V96HOL[l.id]||[];
+ const hit=rows.find(v=>v.slice(0,5)===key);if(hit)return {n:hit.slice(6),k:'local'};
+ if(l.g==='WD'){
+  if(key==='01-01')return {n:'Jour de l’An',k:'an'};
+  if(key==='12-25'&&!['tokyo','pekin','bangkok','caire','dakar','moscou'].includes(l.id))return {n:'Noël',k:'noel'};
+  if(['new-york','washington'].includes(l.id)&&sr===nthDow(x.y,10,3,4))return {n:'Thanksgiving',k:'local'};
+  if(l.id==='ottawa'&&sr===nthDow(x.y,9,0,2))return {n:'Action de grâce',k:'local'};
+  if(l.id==='londres'&&[easterSer(x.y)-2,easterSer(x.y)+1,nthDow(x.y,4,0,1),lastDow(x.y,4,0),lastDow(x.y,7,0)].includes(sr))return {n:'Bank holiday',k:'local'};
+  if(l.id==='brasilia'&&[easterSer(x.y)-48,easterSer(x.y)-47].includes(sr))return {n:'Carnaval',k:'local'};
+ }
+ return null;
+}
+FER.get=v96Holiday;
+FET.get=function(sr){const l=v96Lieu();if(l.g!=='WD')return v96FTGet(sr);const f=v96Holiday(sr);return f?{...f,e:'🎉'}:null;};
+vacOn=function(sr){const l=v96Lieu(),x=ymdS(sr);
+ if(l.g==='FR'){if(S&&S.v96legacy&&l.id==='paris')return v96Vac(sr);const zone=(l.zone.match(/Zone ([ABC])/)||[])[1]||'C';return v96Vac(sr).filter(v=>v.z.includes(zone)).map(v=>({...v,z:[zone]}));}
+ // Calendriers simplifiés explicitement affichés (pas des dates officielles).
+ let summer=l.sud?[12,1]:[7,8];if(['tokyo','pekin','seoul'].includes(l.id))summer=[7,8];
+ let n=summer.includes(x.m+1)?'grandes vacances (simplifiées)':x.m===11&&x.dd>=20||x.m===0&&x.dd<=5?'fin d’année (simplifiées)':x.m===3&&x.dd<=14?'pause scolaire (simplifiée)':null;
+ return n?[{n,e:'🏖️',z:['Locale']}]:[];
+};
+/* Ancienne partie parisienne : coefficients normalisés, aucune variation de caisse. */
+let v96Pending=null,v96Creating=false,v96Active=1,v96Loaded=false,v96Leaving=false;
+const V96ACTIVE='bistrot_active_slot',V96SLOT='bistrot_slot';
+function v96Slots(){const a=[];for(let i=1;i<=5;i++){let s=null;try{s=JSON.parse(localStorage.getItem(V96SLOT+i)||'null');}catch(e){}a.push(s);}return a;}
+function v96Normalize(s,legacy=false){if(!s.v96loc)s.v96loc='paris';if(legacy)s.v96legacy=true;s.v96=1;s.autoStock=true;v96Names();v96Specials(s,false);return s;}
+{const f=newState;newState=function(){
+ const s=f();s.cash=600000;s.v96=1;s.v96loc=v96Pending?v96Pending.loc:'paris';s.v96unplaced=!v96Pending;s.v95perfMig=1;
+ if(v96Pending){s.rName=v96Pending.name;applyPlanToState(s,defaultPlan(v96Pending.pid));s.v96size=v96Pending.pid;}
+ v96Names();for(const id in s.menu)s.menu[id].price=DISH[id].ref;for(const k in s.mdjP)s.mdjP[k]=Math.round(s.mdjP[k]*v96Coef('prix')*10)/10;v96Specials(s,true);return s;
+};}
+{const f=fixSave;fixSave=function(s){const legacy=!s.v96loc, chosen=s.v96loc||'paris',perf=s.v95perfMig,known=new Set(Object.keys(s.menu||{}));s.v96loc=chosen;const r=f(s);S.v96unplaced=false;S.v95perfMig=perf==null?0:perf;v96Normalize(S,legacy);if(legacy)for(const id of v96Lieu().ids)if(!known.has(id))S.menu[id].on=false;return r;};}
+{const f=loadGame;loadGame=function(){
+ try{v96Active=clamp(+localStorage.getItem(V96ACTIVE)||1,1,5);if(!localStorage.getItem(SAVE_KEY)&&localStorage.getItem(V96SLOT+v96Active))localStorage.setItem(SAVE_KEY,localStorage.getItem(V96SLOT+v96Active));}catch(e){}
+ const r=f();v96Loaded=!!r;if(r){try{if(!localStorage.getItem(V96SLOT+v96Active))localStorage.setItem(V96SLOT+v96Active,JSON.stringify(S));localStorage.setItem(V96ACTIVE,''+v96Active);}catch(e){toast('Stockage plein : exportez une copie avant de créer une autre partie.','bad');}}
+ return r;
+};}
+function v96StorageError(){toast('Sauvegarde impossible : stockage plein ou indisponible. Aucune autre partie remplacée.','bad');}
+save=function(){if(!S||SAVEBLOCK||S.v96unplaced||v96Leaving)return false;
+ const raw=JSON.stringify(S),key=V96SLOT+v96Active;let old=null;
+ try{old=localStorage.getItem(key);localStorage.setItem(key,raw);try{localStorage.setItem(SAVE_KEY,raw);localStorage.setItem(V96ACTIVE,''+v96Active);}catch(e){if(old==null)localStorage.removeItem(key);else localStorage.setItem(key,old);throw e;}return true;}catch(e){return false;}
+};
+function v96Switch(i){if(i===v96Active){v96Close();return true;}if(!S.v96unplaced&&!save()){v96StorageError();return false;}const raw=localStorage.getItem(V96SLOT+i);if(!raw)return false;archiveSave();localStorage.setItem(SAVE_KEY,raw);localStorage.setItem(V96ACTIVE,''+i);v96Leaving=true;location.reload();return true;}
+function v96Delete(i){const s=v96Slots()[i-1];if(!s)return;showPopup({icon:'🗑️',title:'Supprimer « '+(s.rName||'Sans nom')+' » ?',body:v96Esc(v96Lieu(s).n)+' · Jour '+(Math.floor(s.t/1440)+1)+' · '+fm(s.cash)+'<p>Cette partie sera effacée définitivement.</p>',choices:[{label:'Oui, supprimer',cls:'danger',cb(){
+ localStorage.removeItem(V96SLOT+i);if(i===v96Active){const left=v96Slots().findIndex(Boolean);if(left>=0){localStorage.setItem(SAVE_KEY,localStorage.getItem(V96SLOT+(left+1)));localStorage.setItem(V96ACTIVE,''+(left+1));v96Leaving=true;location.reload();return;}localStorage.removeItem(SAVE_KEY);S.v96unplaced=true;v96Loaded=false;v96Active=1;}
+ v96Parties();}},{label:'Non',cls:'ghost',cb(){}}]});}
+restoreArchive=function(k){try{const raw=localStorage.getItem(k);if(!raw)return;archiveSave();localStorage.setItem(SAVE_KEY,raw);localStorage.setItem(V96SLOT+v96Active,raw);SAVEBLOCK=null;v96Leaving=true;location.reload();}catch(e){v96StorageError();}};
+/* UI plein écran : style bordeaux/crème existant, mêmes cartes que les maquettes. */
+const V96UI={mode:'new',g:'FR',loc:'paris',pid:1,slot:1,step:1,name:'Chez YaYa',date:D0_DEF};
+function v96Root(){let el=document.getElementById('v96screen');if(!el){el=document.createElement('section');el.id='v96screen';el.setAttribute('aria-label','Emplacements et parties');document.getElementById('app').appendChild(el);el.addEventListener('click',v96Click);el.addEventListener('change',e=>{if(e.target.id==='v96dest'){V96UI.loc=e.target.value;v96MoveScreen();}});}el.hidden=false;S.speed=0;return el;}
+function v96Close(){const el=document.getElementById('v96screen');if(el)el.hidden=true;}
+const v96Btn=(text,a,p='',cls='primary',disabled=false)=>'<button class="btn '+cls+'" data-v96="'+a+'" data-v="'+v96Esc(p)+'"'+(disabled?' disabled':'')+'>'+text+'</button>';
+function v96Head(title,sub,right=''){return '<div class="v96top"><b>'+title+'</b><small>'+sub+'</small><div class="v96right">'+right+'</div></div>';}
+function v96Pct(n){const x=Math.round((n-1)*100);return(x>0?'+':'')+x+' %';}
+function v96LieuCard(l,select=false){return '<div class="card '+(select?'v96selected':'')+'" data-v96="lieu" data-v="'+l.id+'" tabindex="0" role="button"><h3>'+l.e+' '+l.n+'</h3><div class="v96metrics">'+[['👥 Affluence','aff'],['💶 Salaires','sal'],['🔨 Travaux','trav'],['🏷️ Prix conseillés','prix']].map(([n,k])=>'<span>'+n+'</span><b class="'+((k==='aff'?l[k]>1:l[k]<1)?'v96good':'')+'">'+v96Pct(l[k])+'</b>').join('')+'<span>🌦️ Météo</span><b>'+l.wx.split(',')[0]+'</b><span>📸 Touristes</span><b>'+l.tour+'</b></div><div class="v96sp">🍽️ '+l.spec.join(' · ')+'</div></div>';}
+function v96New(slot){if(!S.v96unplaced&&!save()){v96StorageError();return;}const list=v96Slots();slot=slot||list.findIndex(x=>!x)+1;if(!slot){v96Parties(true);return;}Object.assign(V96UI,{mode:'new',g:'FR',loc:'paris',pid:1,slot,step:1,name:'Chez YaYa',date:D0_DEF});v96Choose();}
+newGameFlow=function(){v96New();};
+function v96Choose(){const u=V96UI,l=LIEUX.find(x=>x.id===u.loc);u.step=1;
+ v96Root().innerHTML=v96Head('🍷 Nouvelle partie — 1/2 · Où ouvrir ton bistrot ?','Capital : 600 000 €',Object.entries({FR:'🇫🇷 France',DOM:'🌴 DOM-TOM',WD:'🌍 Monde'}).map(([g,n])=>v96Btn(n+' ('+LIEUX.filter(x=>x.g===g).length+')','group',g,u.g===g?'primary':'ghost')).join(''))+
+ '<div class="v96wrap"><div class="v96grid">'+LIEUX.filter(x=>x.g===u.g).map(x=>v96LieuCard(x,x.id===u.loc)).join('')+'</div><aside><div class="card"><h3>Sélection : '+l.e+' '+l.n+'</h3><small>'+l.zone+'<br>Noms : '+l.noms.join(', ')+'…<br>Pas de loyer · euros partout.</small></div><div class="card"><b>♻️ Tout le jeu est conservé partout</b><p>Stocks, menu du jour, événements, groupes, équipe, formations, travaux, déco, calendrier… seuls les paramètres changent.</p><small>Coefficients affichés : référence province. Dans le moteur, référence Paris (équilibre de votre ancienne partie conservé).</small></div>'+v96Btn('Suivant : taille du local ›','size')+v96Btn('‹ Mes parties','slots','','ghost')+'</aside></div>';
+}
+function v96Size(){const u=V96UI,l=LIEUX.find(x=>x.id===u.loc);u.step=2;
+ const dates=[];for(let sr=D0_DEF;sr<=D0_DEF+420;sr+=7){const x=ymdS(sr);dates.push('<option value="'+sr+'"'+(sr===u.date?' selected':'')+'>lundi '+x.dd+' '+MOIS[x.m]+' '+x.y+'</option>');}
+ v96Root().innerHTML=v96Head('🍷 Nouvelle partie — 2/2 · Taille du local',l.e+' '+l.n)+'<div class="v96size"><div class="v96sizes">'+PREMISES.map((p,i)=>'<div class="card '+(u.pid===i?'v96selected':'')+'" data-v96="pid" data-v="'+i+'"><h3>'+['🍻','🍽️','🏛️'][i]+' '+p.n+'</h3><small>'+p.sub+' · '+p.w+'×'+p.h+'</small><div class="v96row"><span>Valeur du local</span><b>'+fm(l.local*v96SizeFactor[i])+'</b></div><small>Local déjà à toi · valeur utile seulement pour un déménagement</small></div>').join('')+'</div><div class="v96sizes"><div class="card"><h3>Récapitulatif</h3><p>'+l.e+' '+l.n+' · '+PREMISES[u.pid].n+' (possédé)</p><div class="v96row"><span>Trésorerie de départ</span><b class="qa">600 000 €</b></div><div class="v96row"><span>Loyer</span><b>0 € (propriétaire)</b></div></div><div class="card"><h3>Nom du restaurant</h3><input id="v96name" class="ti" maxlength="40" value="'+v96Esc(u.name)+'" aria-label="Nom du restaurant"><label>Premier lundi <select id="v96date" class="sl">'+dates.join('')+'</select></label><div class="v96sp">Spécialités ajoutées : '+l.spec.join(' · ')+'</div><div class="btnrow">'+v96Btn('‹ Retour','back','','ghost')+v96Btn('Ouvrir mon bistrot 🎉','create')+'</div></div></div></div>';
+}
+function v96Create(){const u=V96UI,inp=document.getElementById('v96name'),dt=document.getElementById('v96date');u.name=(inp?inp.value:u.name).trim().slice(0,40)||'Chez YaYa';const d0=dt?+dt.value:D0_DEF;
+ if(!S.v96unplaced&&!save()){v96StorageError();return false;}archiveSave();const replaced=localStorage.getItem(V96SLOT+u.slot);if(replaced&&u.slot!==v96Active){try{localStorage.setItem(SAVE_ARCH+Date.now()+'_slot'+u.slot,replaced);}catch(e){v96StorageError();return false;}}
+ const oldActive=v96Active,oldS=S,raw=localStorage.getItem(V96SLOT+u.slot);v96Pending={loc:u.loc,pid:u.pid,name:u.name};v96Active=u.slot;
+ try{newState();S.cal0=d0;S.v96unplaced=false;S.tut=true;applyRName();if(!save())throw Error('Stockage plein');}catch(e){S=oldS;v96Active=oldActive;if(raw!=null)localStorage.setItem(V96SLOT+u.slot,raw);v96Pending=null;v96StorageError();return false;}
+ v96Pending=null;v96Loaded=true;v96Close();panelClose();if(ED.open)edClose();ui.mq=[];ui.modal=null;$('#modal').classList.add('hidden');ui.tab='home';ui.cart={};R.sel=null;placeAll();updateNav();renderTab(true);hdrCache='';updateHeader();v6Intro(false);return true;
+}
+function v96Parties(replace=false){if(!S.v96unplaced)save();const a=v96Slots();v96Root().innerHTML=v96Head('💾 Mes parties',a.filter(Boolean).length+' / 5 emplacements utilisés',!S.v96unplaced?v96Btn('✕','close','','ghost'):'')+'<div class="v96slots">'+(replace?'<p class="bad">Les 5 emplacements sont occupés. Choisissez la partie à remplacer (elle sera archivée).</p>':'')+a.map((s,j)=>{const i=j+1;if(!s)return '<div class="card v96slot"><b>'+i+'</b><span class="grow">Emplacement libre</span>'+v96Btn('＋ Nouvelle partie','new',i)+'</div>';const l=v96Lieu(s),d=Math.floor(s.t/1440)+1,x=ymdS((s.cal0||D0_DEF)+d-1);return '<div class="card v96slot '+(i===v96Active?'v96selected':'')+'"><b>'+i+'</b><div class="grow"><h3>'+v96Esc(s.rName||'Chez YaYa')+(i===v96Active?' <small>en cours</small>':'')+'</h3><small>'+l.e+' '+l.n+' · Jour '+d+' · '+DOWS[x.w]+' '+x.dd+' '+MOIS3[x.m]+' '+x.y+'</small></div><div><b>'+fm(s.cash)+'</b><br><small>'+Number(s.rep).toFixed(1)+' ⭐</small></div>'+v96Btn(replace?'Remplacer':i===v96Active?'Reprendre':'Jouer',replace?'replace':'switch',i)+v96Btn('🗑️','delete',i,'ghost')+'</div>';}).join('')+'</div>';}
+function v96Click(e){const b=e.target.closest('[data-v96]');if(!b||b.disabled)return;e.stopPropagation();const a=b.dataset.v96,p=b.dataset.v,u=V96UI;
+ if(a==='group'){u.g=p;u.loc=LIEUX.find(l=>l.g===p).id;v96Choose();}
+ if(a==='lieu'&&u.mode!=='move'){u.loc=p;v96Choose();}if(a==='size')v96Size();if(a==='back'){u.name=document.getElementById('v96name').value;u.date=+document.getElementById('v96date').value;v96Choose();}if(a==='pid'){u.name=document.getElementById('v96name').value;u.date=+document.getElementById('v96date').value;u.pid=+p;v96Size();}if(a==='create')v96Create();if(a==='slots')v96Parties();if(a==='new')v96New(+p);if(a==='close')v96Close();if(a==='switch')v96Switch(+p);if(a==='delete')v96Delete(+p);
+ if(a==='replace')showPopup({icon:'🔄',title:'Remplacer cette partie ?',body:'Elle sera archivée avant de créer la nouvelle partie.',choices:[{label:'Oui',cb(){v96New(+p);}},{label:'Non',cls:'ghost',cb(){}}]});
+ if(a==='move')v96MoveConfirm();
+}
+{const f=v6Intro;v6Intro=function(old){if(S.v96unplaced){v96New(1);return;}if(S.v96&&S.pw.j0){S.tut=true;save();showPopup({icon:'🥖',title:'Bienvenue chez '+rName()+' !',body:'📍 '+v96Lieu().e+' '+v96Lieu().n+'<p>Vous possédez votre '+PREMISES[S.plan.pid].n+' et gardez <b>600 000 €</b> en caisse. Aucun loyer. Vos spécialités locales sont déjà à la carte.</p><p>Jour 0 : aménagez le local, puis retrouvez la semaine de préparation actuelle.</p>',choices:[{label:'Construire mon établissement ▶',cb(){edOpen('j0');}}]});return;}return f(old);};}
+{const f=edOpen;edOpen=function(mode,plan){if(mode==='j0'&&S.v96unplaced){v96New();return;}const r=f(mode,plan);if(mode==='j0'&&S.v96&&S.v96size!=null){edAct('prem',S.v96size);}return r;};}
+{const f=showPopup;showPopup=function(o){if(o.title&&o.title.startsWith('Menu')){o.choices=o.choices.slice();o.choices.splice(1,0,{label:'💾 Mes parties (5 emplacements)',cls:'ghost',cb(){v96Parties();}},{label:'🚚 Déménager le bistrot',cls:'ghost',cb(){v96MoveScreen();}},{label:'🗄️ Restaurer une archive',cls:'ghost',cb(){const a=archiveList();showPopup({icon:'🗄️',title:'Archives de sécurité',body:'Restaurer remplace la partie active uniquement.',choices:a.map(k=>({label:k.slice(SAVE_ARCH.length),cb(){restoreArchive(k);}})).concat([{label:'Annuler',cls:'ghost',cb(){}}])});}});}return f(o);};}
+document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>{if(v96Loaded&&v96Slots().filter(Boolean).length>1){if(ED.open)edClose();v96Parties();}},250);});
+{const style=document.createElement('style');style.textContent=`
+#v96screen{position:fixed;inset:0;z-index:46;background:var(--bg);color:var(--ink);font-size:12px;display:flex;flex-direction:column}#v96screen[hidden]{display:none}#v96screen .btn{min-height:30px;padding:6px 10px;font-size:12px}#v96screen .card{padding:9px;margin:0;min-width:0}#v96screen h3{font-size:14px;margin:0 0 5px}#v96screen small{color:var(--mute);font-size:11px}#v96screen p{margin:5px 0;font-size:12px}#v96screen .v96good{color:var(--ok)}#v96screen .v96top .btn,#v96screen .v96slot .btn{width:auto;flex:0 0 auto}#v96screen .v96slot>.grow{min-width:0}#v96screen .v96slot>div:not(.grow){white-space:nowrap;flex:none}.v96top{background:var(--hd);color:white;display:flex;align-items:center;gap:10px;padding:8px 12px;min-height:48px;flex-wrap:wrap}.v96top b{font-size:16px}.v96top small{color:#d6cacf!important}.v96right{margin-left:auto;display:flex;gap:6px}.v96wrap{display:flex;gap:10px;padding:8px 10px;overflow:auto;flex:1;min-height:0}.v96grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:8px;align-content:start;flex:1;overflow:auto;padding:3px;min-width:0}.v96grid .card{cursor:pointer}.v96selected{outline:3px solid var(--gold)}.v96metrics{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:11px}.v96metrics span{color:var(--mute)}.v96metrics b{font-weight:500}.v96sp{font-size:11px;color:var(--acc);margin-top:5px}.v96wrap aside{width:220px;flex:none;display:flex;flex-direction:column;gap:8px;overflow:auto;padding:3px}.v96row{display:flex;justify-content:space-between;gap:6px;padding:4px 0;border-bottom:1px dashed var(--line)}.v96size{padding:10px;overflow:auto}.v96sizes{display:flex;gap:10px;margin-bottom:10px}.v96sizes>.card{flex:1;cursor:pointer}.v96sizes label{display:flex;align-items:center;gap:6px;margin-top:5px}.v96sizes input{width:100%}.v96sizes select{max-width:70%}.v96slots{display:flex;flex-direction:column;gap:8px;padding:10px;overflow:auto}.v96slot{display:flex;align-items:center;gap:10px}.v96slot>.grow{flex:1}.v96slot>b{font-size:18px}.v96slot .btn{flex:none}.v96movecols{display:flex;gap:12px}.v96movecols>.card{flex:1}.v96moveleft{flex:1;overflow:auto;padding:3px}.v96moveleft select{max-width:100%;width:100%;margin-bottom:10px}
+@media(max-width:650px){.v96wrap{flex-direction:column}.v96wrap aside{width:auto;overflow:visible}.v96grid{overflow:visible}.v96sizes{flex-direction:column}.v96slot{flex-wrap:wrap}.v96right{margin-left:0}.v96movecols{flex-direction:column}}
+`;document.head.appendChild(style);}
+
+/* ===== v9.6 part d ===== */
+/* v9.6 — déménagement via la fermeture pour travaux existante. */
+function v96Km(a,b){const r=Math.PI/180,dy=(b.lat-a.lat)*r,dx=(b.lon-a.lon)*r,h=Math.sin(dy/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dx/2)**2;return Math.round(6371*2*Math.atan2(Math.sqrt(h),Math.sqrt(Math.max(0,1-h))));}
+function v96Quote(id){const a=v96Lieu(),b=LIEUX.find(l=>l.id===id);if(!b)return null;const km=v96Km(a,b),transport=Math.min(60000,Math.round(2000+1.2*km)),old=v96Value(a),next=v96Value(b),sale=Math.round(old*.9),total=transport+next-sale;
+ const foreign=b.g==='WD',sameRegion=a.id===b.id||[a.id,b.id].every(x=>['paris','idf'].includes(x));const days=sameRegion?3:foreign||a.g==='WD'?10:b.g==='DOM'||a.g==='DOM'?7:5,staff=S.staff.filter(s=>!s.tmp),follow=foreign?Math.round(staff.length*.7):staff.length;
+ const start=dayNum()+1,end=start+days-1,busy=upgBusy(start,days);return {from:a.id,to:b.id,km,transport,old,next,sale,total,days,start,end,rep:Math.round((3+.6*Math.max(0,S.rep-3))*100)/100,follow,staff:staff.length,busy};}
+function v96MoveScreen(){V96UI.mode='move';if(!LIEUX.some(l=>l.id===V96UI.loc)||V96UI.loc===v96Lieu().id)V96UI.loc=v96Lieu().id==='provence'?'bretagne':'provence';const q=v96Quote(V96UI.loc),a=v96Lieu(),b=LIEUX.find(l=>l.id===V96UI.loc);const ready=dayNum()>=OPEN_DAY&&!S.pw.j0&&!q.busy&&b.id!==a.id;
+ v96Root().innerHTML=v96Head('🚚 Déménager le bistrot',PREMISES[S.plan.pid].n+' · Jour '+dayNum(),v96Btn('✕','close','','ghost'))+'<div class="v96wrap"><div class="v96moveleft"><select id="v96dest" class="sl" aria-label="Nouveau lieu">'+['FR','DOM','WD'].map(g=>'<optgroup label="'+({FR:'France',DOM:'DOM-TOM',WD:'Monde'}[g])+'">'+LIEUX.filter(l=>l.g===g).map(l=>'<option value="'+l.id+'"'+(l.id===b.id?' selected':'')+'>'+l.e+' '+l.n+'</option>').join('')+'</optgroup>').join('')+'</select><div class="v96movecols">'+v96LieuCard(a)+v96LieuCard(b)+'</div><div class="card" style="margin-top:10px"><h3>✅ Ce que tu gardes</h3><p>👥 '+q.follow+' / '+q.staff+' employés suivent'+(b.g==='WD'?' (70 %, arrondis)':'')+' · ⭐ Réputation '+S.rep.toFixed(2)+' → '+q.rep.toFixed(2)+' · 🌟 Étoile Michelin gardée</p><p>🗺️ Plan et déco, améliorations, stocks secs conservés. Les produits frais sont perdus au départ. Salaires adaptés au lieu, prix de vente libres.</p></div><div class="card" style="margin-top:8px"><small>'+b.zone+' · '+(b.g!=='FR'?'Fériés fixes locaux et vacances simplifiées (pas un calendrier officiel).':'Vacances scolaires de la zone locale.')+'</small></div></div><aside><div class="card"><h3>💶 Coût détaillé</h3>'+[['Transport ('+q.km+' km)',fm(q.transport)],['Achat nouveau local',fm(q.next)],['Revente ancien (90 %)','− '+fm(q.sale)],['Total',q.total<0?'Gain : + '+fm(-q.total):'À payer : '+fm(q.total)],['Trésorerie après',fm(S.cash-q.total)]].map(([n,v])=>'<div class="v96row"><span>'+n+'</span><b>'+v+'</b></div>').join('')+'</div><div class="card"><h3>🔒 Fermeture : '+q.days+' jours</h3><small>Du '+dateShort(q.start)+' au '+dateShort(q.end)+'. Réouverture le '+dateShort(q.end+1)+'. Salaires maintenus, perfectionnement inclus, pas de loyer.</small></div>'+(q.busy?'<p class="bad">Impossible : '+v96Esc(q.busy)+'</p>':'')+(dayNum()<OPEN_DAY?'<p>Disponible après l’ouverture.</p>':'')+v96Btn('Confirmer le déménagement','move','','primary',!ready||q.total>S.cash)+'</aside></div>';
+}
+function v96MoveConfirm(){const q=v96Quote(V96UI.loc);if(!q||q.to===q.from)return;showPopup({icon:'🚚',title:'Confirmer le déménagement ?',body:'Vers <b>'+v96Esc(LIEUX.find(l=>l.id===q.to).n)+'</b><p>'+(q.total<0?'Gain : '+fm(-q.total):'Coût : '+fm(q.total))+' · fermeture '+q.days+' jours.</p><p>'+q.follow+' / '+q.staff+' employés suivent. Produits frais perdus. Réputation : '+q.rep.toFixed(2)+'. Étoile Michelin conservée.</p>',choices:[{label:'Oui, déménager',cls:'primary',cb(){const r=v96Move(q.to);if(r.ok)v96Close();toast(r.msg,r.ok?'good':'bad');}},{label:'Non',cls:'ghost',cb(){}}]});}
+function v96Move(id){const q=v96Quote(id);if(!q||q.from===q.to)return {ok:false,msg:'Choisissez un autre lieu.'};if(dayNum()<OPEN_DAY||S.pw.j0)return {ok:false,msg:'Disponible après l’ouverture.'};if(q.busy)return {ok:false,msg:'Impossible : '+q.busy};if(q.total>S.cash)return {ok:false,msg:'Trésorerie insuffisante.'};
+ archiveSave();if(q.total>=0)spend(q.total,'invest');else{S.cash-=q.total;S.day.invest=(S.day.invest||0)+q.total;S.day.v96sale=(S.day.v96sale||0)-q.total;}
+ S.trav={start:q.start,end:q.end,days:q.days,cost:q.total,kitchen:true,gros:true,prime:0,plan:null,walls:false,v96move:q};
+ S.v96moves=S.v96moves||[];S.v96moves.push({...q,booked:dayNum()});note('🚚 Déménagement réservé : '+v96Lieu().n+' → '+LIEUX.find(l=>l.id===id).n+' · fermeture '+q.days+' jours. '+(q.total<0?'Gain '+fm(-q.total):'Coût '+fm(q.total))+'.','info');save();renderTab(true);return {ok:true,msg:'Déménagement prévu dès demain. Étoile Michelin conservée.'};
+}
+{const f=v8TravStart;v8TravStart=function(T){if(!T.v96move)return f(T);const q=T.v96move,dry={};
+ for(const i in S.stock)if(ING[i]&&ING[i].sp<=.05)dry[i]={...S.stock[i],lots:JSON.parse(JSON.stringify(lots(i)))};
+ const old=v96Lieu(),b=LIEUX.find(l=>l.id===q.to);let team=S.staff.filter(s=>!s.tmp);const departed=[];
+ if(b.g==='WD'){for(let i=team.length-1;i>0;i--){const j=rint(0,i);[team[i],team[j]]=[team[j],team[i]];}departed.push(...team.slice(q.follow).map(s=>s.id));for(const id of departed)removeStaffWork(id);S.staff=S.staff.filter(s=>!departed.includes(s.id)&&!s.tmp);}
+ S.v96loc=q.to;S.v96legacy=false;S.v96unplaced=false;S.rep=q.rep;v96Names();
+ for(const s of S.staff)s.wage=Math.round(s.wage*b.sal/old.sal);
+ S.pw.cands=[];S.cand=[];S.vivier={};
+ let lost=0;for(const i in S.stock)if(ING[i]&&ING[i].sp>.05){lost+=S.stock[i].q*S.stock[i].cost;S.stock[i].q=0;S.lots[i]=[];}S.day.loss+=lost;q.freshLost=Math.round(lost);q.departed=departed.length;
+ v96Specials(S,true);for(const i in dry){S.stock[i].q=0;S.lots[i]=[];}const r=f(T);
+ for(const i in dry){const {lots:L,...st}=dry[i];S.stock[i]=st;S.lots[i]=L;}
+ S.v96lastMove={...q};note('📍 Installation à '+b.n+' : '+S.staff.filter(s=>!s.tmp).length+' employés, produits frais perdus '+fm(lost)+', étoile conservée.','info');save();return r;
+};}
+{const f=viewRoom;viewRoom=function(){return card('📍 '+v96Lieu().e+' '+v96Lieu().n,'<p>Propriétaire · loyer 0 € · valeur du local '+fm(v96Value())+'</p>'+btn('🚚 Déménager le bistrot','v96move',null,null,'ghost'))+f();};}
+ACT.v96move=function(){v96MoveScreen();};
+/* Mémo du réassort de secours dans le journal de clôture. */
+{const f=endDay;endDay=function(){if(S.day.v96express)note('🛵 Réassort garanti : '+S.day.v96units+' unités livrées en urgence, '+fm(S.day.v96express)+' facturés (achats déjà comptabilisés).','info');return f.apply(this,arguments);};}
+window.V96={LIEUX,lieu:v96Lieu,quote:v96Quote,move:v96Move,newParty:v96New,create:v96Create,slots:v96Slots,switchSlot:v96Switch,parties:v96Parties,normalize:v96Normalize,supply:v96Supply};
+/* Repères visibles : lieu actif et vacances locales sur le calendrier. */
+{const f=VIEWS.home;VIEWS.home=function(){const l=v96Lieu(),wx=weatherOf(dayNum());return card('📍 '+l.e+' '+l.n,'<div class="chips"><span class="chip ok">Propriétaire · loyer 0 €</span><span class="chip">'+wx.e+' '+wx.t+' °C · '+wx.n+'</span><span class="chip">🧳 Tourisme ×'+v96Tour().toFixed(2).replace('.',',')+'</span></div>')+f();};}
+{const f=calCell;calCell=function(sr){const h=f(sr);return vacOn(sr).some(v=>v.z.includes('Locale'))?h.replace('<span class="zs">','<span class="zs"><i class="z" style="background:#8762a8" title="Vacances locales simplifiées"></i>'):h;};}
+{const f=PANELS.cal.f;PANELS.cal.f=function(){return (v96Lieu().g!=='FR'?'<div class="card"><b>📍 '+v96Lieu().n+'</b> · 🟣 Vacances locales simplifiées. Fériés fixes locaux ; calendrier de jeu indicatif.</div>':'')+f();};}
 
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
