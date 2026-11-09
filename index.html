@@ -9655,6 +9655,32 @@ window.V98={sides:V98SIDES,cu:V98CU,sig:()=>v98SigAll(),queue:()=>S.pw.v98q,pump
 /* v9.8 : intro v9.7 du chef se terminant par une virgule → minuscule au mot suivant (« Pour préparer le service ensemble, le mois… ») */
 { const f=dialogue; dialogue=function(who,txt){ const h=f.apply(this,arguments); try{ return h.replace(/(« [^«»<]{3,60}, )(Le|La|Les|L’|Nous|Fin|Voici|Vos|Votre|Un|Une|Ce|Cette|Ces|On|Je|Il|Elle|Avec|Pour|Si)\b/,(m,a,w)=>a+w.toLowerCase()); }catch(e){ return h; } }; }
 
+/* ===== v9.8 part e ===== */
+/* v9.8.1 — Faillite → « Recommencer une partie »
+   Cause : depuis v9.6, « Recommencer » ouvre l'écran plein écran Nouvelle partie / Mes parties (#v96screen, z-index 46)
+   mais la fenêtre de faillite (#gameover, overlay z-index 50) n'était jamais masquée : l'écran s'ouvrait DESSOUS, invisible.
+   Correctif : masquer la faillite (et vider les fenêtres en attente) avant d'ouvrir l'écran, réutiliser l'emplacement
+   en faillite pour la nouvelle partie (les autres restent intacts), ré-afficher le bilan si on referme sans créer,
+   bouton « Mes parties » sur le bilan, badge 🏚️ Faillite dans la liste des parties. */
+function v981Over(){ return !!(S&&S.over&&!S.v96unplaced); }
+function v981Hide(){ const g=document.getElementById('gameover'); if(g) g.classList.add('hidden'); }
+function v981ClearModal(){ ui.mq=[]; ui.modal=null; const m=document.getElementById('modal'); if(m) m.classList.add('hidden'); }
+{ const f=v96New; v96New=function(slot){ if(v981Over()){ v981Hide(); v981ClearModal(); if(slot==null) slot=v96Active; } return f(slot); }; }
+{ const f=v96Parties; v96Parties=function(replace){ if(v981Over()){ v981Hide(); v981ClearModal(); } const r=f(replace);
+  try{ const a=v96Slots(), cards=document.querySelectorAll('#v96screen .v96slot');
+    a.forEach((s,j)=>{ if(!s||!s.over||!cards[j]) return; const h=cards[j].querySelector('h3'); if(h&&!h.querySelector('.v981bk')) h.insertAdjacentHTML('beforeend',' <small class="v981bk">🏚️ Faillite (jour '+(s.over.day|0)+')</small>'); });
+  }catch(e){ console.warn(e); } return r; }; }
+{ const f=v96Close; v96Close=function(){ const r=f(); if(v981Over()&&!v96Leaving) showGameOver(); return r; }; }
+{ const f=v96Create; v96Create=function(){ const r=f(); if(r) v981Hide(); return r; }; }
+{ const f=showGameOver; showGameOver=function(){ const v=document.getElementById('v96screen'); if(v&&!v.hidden) return; v981ClearModal(); f();
+  const sh=document.querySelector('#gameover .sheet'), rb=sh&&sh.querySelector('[data-a="restart"]');
+  if(rb&&!sh.querySelector('[data-a="v981slots"]')){ const row=document.createElement('div'); row.className='v981row'; rb.replaceWith(row); row.appendChild(rb);
+    row.insertAdjacentHTML('beforeend','<button class="btn ghost big" data-a="v981slots"><span>💾 Mes parties</span><small>changer / supprimer</small></button>'); } }; }
+ACT.v981slots=function(){ v96Parties(); };
+(function(){ const st=document.createElement('style'); st.textContent='#v96screen .v981bk{color:var(--bad,#b3261e);font-weight:700}#gameover .v981row{display:flex;gap:8px;align-items:stretch}#gameover .v981row .btn{margin:0}#gameover .v981row .btn.primary{flex:2}#gameover .v981row .btn.ghost{flex:1}'; document.head.appendChild(st); })();
+/* Au chargement d'une partie en faillite : montrer le bilan (bouton fonctionnel) plutôt que l'écran automatique « Mes parties » posé dessous. */
+{ const f=loadGame; loadGame=function(){ const r=f(); if(r&&S&&S.over) v96Loaded=false; return r; }; }
+
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
 document.addEventListener('DOMContentLoaded',boot);
