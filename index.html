@@ -1282,10 +1282,10 @@ function orderPicks(g){
     let m=null, sp=false;
     if(k===0&&g.sp&&g.sp.d&&pool.includes(g.sp.d)&&dishAvail(g.sp.d)){ m=g.sp.d; sp=true; }
     if(!m&&k===0&&g.reg){ const r=REG(g.reg); if(r&&pool.includes(r.fav)&&rnd()<0.9) m=r.fav; }
-    if(!m) m=pickWeighted(pool,i=>DISH[i].pop*Math.pow(DISH[i].ref/S.menu[i].price,1.5)*(DISH[i].cat==='entree'?0.45:1));
+    if(!m) m=pickWeighted(pool,i=>DISH[i].pop*Math.pow(DISH[i].ref/S.menu[i].price,1.5)*(DISH[i].cat==='entree'?0.45:1)*v98W(i));
     picks.push({k,d:m,main:true,sp});
-    if(DISH[m].cat==='plat'&&rnd()<0.32*lim&&ents.length){ const x=pickWeighted(ents,i=>DISH[i].pop*pel(i)); if(rnd()<pel(x)) picks.push({k,d:x}); }
-    if(dess.length){ const x=pickWeighted(dess,i=>DISH[i].pop*pel(i)); if(rnd()<(0.45+(g.type==='habitue'?0.15:0)+(g.type==='famille'?0.1:0))*pel(x)*lim) picks.push({k,d:x}); }
+    if(DISH[m].cat==='plat'&&rnd()<0.32*lim&&ents.length){ const x=pickWeighted(ents,i=>DISH[i].pop*pel(i)*v98W(i)); if(rnd()<pel(x)) picks.push({k,d:x}); }
+    if(dess.length){ const x=pickWeighted(dess,i=>DISH[i].pop*pel(i)*v98W(i)); if(rnd()<(0.45+(g.type==='habitue'?0.15:0)+(g.type==='famille'?0.1:0))*pel(x)*lim) picks.push({k,d:x}); }
     pickMealDrinks(g,k,alg).forEach(d=>picks.push({k,d}));
   }
   return picks;
@@ -4341,7 +4341,7 @@ const tabSeatsTotal=()=>{ try{ return compilePlan(S.plan).seats; }catch(e){ retu
    V6 · STOCKS : plafonds, commande automatique avec réserve, promotions fournisseurs
    ===================================================================== */
 const CAP_CARTE=600, CAP_SPEC=200, CAP_MDJ=300;
-const carteUse=()=>{ const u={}; for(const id in DISH){ if(S.menu[id]&&S.menu[id].on&&!dishLocked(id)) for(const i in DISH[id].rec) u[i]=(u[i]||0)+1; } return u; };
+let carteUse=()=>{ const u={}; for(const id in DISH){ if(S.menu[id]&&S.menu[id].on&&!dishLocked(id)) for(const i in DISH[id].rec) u[i]=(u[i]||0)+1; } return u; };
 const mdjCarteSet=()=>{ const set={}; if(S.mdj&&S.mdj.fmt===5) for(const id of mdjIds()) for(const i in DISH[id].rec) set[i]=1; return set; };
 function reserveScale(){ try{ const C=compilePlan(S.plan); return clamp(0.5+0.17*(C.cnt.S||0),0.5,1); }catch(e){ return 1; } }
 function capOf(i){ const cu=carteUse(), ms=mdjCarteSet(); const sc=reserveScale(); let c;
@@ -4626,7 +4626,7 @@ function v6DayStart(){ const pw=S.pw; if(!pw) return; const d=dayNum(); v6ApplyA
   S.day.interim=S.staff.filter(x=>x.tmp).reduce((a,x)=>a+x.wage,0);
   try{ if(d>=OPEN_DAY&&typeof trainReqGen==='function'){ trainReqGen(); if(H.interactive) setTimeout(()=>{ try{ trainReqPopup(); }catch(e){} },400); } }catch(e){ console.error(e); }
   pw.tk={day:d,n:0,orders:[]}; try{ wkDay(); if(tkOK()){ if(worksNow()) wkPlan(); else v6TakeawayPlan(); } }catch(e){ console.error(e); }
-  if(d>=OPEN_DAY&&seasonDue()&&!pw['sa'+monthIdx(d)]){ pw['sa'+monthIdx(d)]=true; showPopup({icon:'🍂',title:'Réunion de saison',body:'C’est la dernière semaine du mois : le chef propose des <b>plats de saison</b> pour remplacer les moins vendus. Les <b>plats phares ⭐</b> restent à la carte.',choices:[{label:'Ouvrir la réunion ▶',cb(){ panelOpen('season'); }},{label:'Plus tard',cls:'ghost',cb(){}}]}); }
+  if(d>=OPEN_DAY&&seasonDue()&&!pw['sa'+monthIdx(d)]){ pw['sa'+monthIdx(d)]=true; showPopup({icon:'🍂',title:'Réunion de saison',body:'C’est la dernière semaine du mois : le chef propose des <b>plats de saison</b> pour remplacer les moins vendus. Les <b>signatures ⭐</b> ne sont pas protégées : le chef vous signale s’il en propose une.',choices:[{label:'Ouvrir la réunion ▶',cb(){ panelOpen('season'); }},{label:'Plus tard',cls:'ghost',cb(){}}]}); }
   }
 function v6EndDay(ds){ const pw=S.pw; if(!pw) return; const d=dayNum();
   try{ stockUsageDay(); }catch(e){ console.error(e); }
@@ -9335,6 +9335,325 @@ function v97DirectReview(stars,text,g){const c=v97Client(g),p=v97Profile(c);text
 /* Réactions à un devis de groupe : les décisions/budgets restent ceux d’evOffer. */
 {const f=evAccept;evAccept=function(e){const r=f.apply(this,arguments),c=v97Client({id:e.id,name:e.name});e.msg='« '+v97Pick(c,'event.accept',v97Profile(c).clientEvent.accept,e.rounds||0)+' »';return r;};}
 {const f=evOffer;evOffer=function(e){const r=f.apply(this,arguments);if(e.st==='neg'&&e.msg){const c=v97Client({id:e.id,name:e.name});e.msg='« '+v97Pick(c,'event.budget',v97Profile(c).clientEvent.budget,e.rounds||0)+' »';}return r;};}
+
+/* ===== v9.8 part a ===== */
+/* v9.8 a — données, hasard dédié, cuissons, accompagnements, « Fait maison ».
+   Aucun tirage rnd() supplémentaire : les choix des clients utilisent un hachage déterministe (ivHash). */
+const V98ING={
+ huile:{n:'Huile de friture (tournesol)',e:'🫗',p:0.14,sp:0,sh:365},
+ beurre:{n:'Beurre doux',e:'🧈',p:0.22,sp:0.04,sh:30},
+ salverte:{n:'Salade verte (laitue, mesclun)',e:'🥬',p:0.32,sp:0.30,sh:4},
+ legsais:{n:'Légumes de saison (garniture)',e:'🥕',p:0.55,sp:0.20,sh:6}
+};
+for(const [k,o] of Object.entries(V98ING)){ const base=o.p; ING[k]={n:o.n,e:o.e,sp:o.sp,v98:1}; Object.defineProperty(ING[k],'p',{get(){ try{ return Math.round(base*v96Coef('prix')*100)/100; }catch(e){ return base; } },enumerable:true,configurable:true}); SHELF[k]=o.sh; }
+for(const k of [...Object.keys(V98ING),'lait']) if(!FOOD_ING.includes(k)&&!DRINK_ING.includes(k)) FOOD_ING.push(k);
+const V98SIDES={
+ frites:{n:'Frites',e:'🍟',rec:{patate:1,huile:1}},
+ puree:{n:'Purée maison',e:'🥔',rec:{patate:1,beurre:1,lait:1}},
+ salade:{n:'Salade verte',e:'🥗',rec:{salverte:1}},
+ legumes:{n:'Légumes de saison',e:'🥕',rec:{legsais:1}},
+ riz:{n:'Riz',e:'🍚',rec:{feculents:1}},
+ gratin:{n:'Gratin dauphinois',e:'🥘',rec:{patate:1,creme:1,lait:1}}
+};
+const V98SIDE_IDS=Object.keys(V98SIDES), V98EXTRA=1;
+const V98CU={bleue:{n:'Bleue',e:'🟥',f:0.88},saignante:{n:'Saignante',e:'🔴',f:0.94},apoint:{n:'À point',e:'🟠',f:1},bien:{n:'Bien cuite',e:'🟤',f:1.1}};
+const V98CU_ORDER=['bleue','saignante','apoint','bien'];
+/* familles de lieux (culture v9.7 = lieu courant) : répartitions réalistes simplifiées */
+const V98ZONE={bruxelles:'fr',londres:'anglo','new-york':'anglo',washington:'anglo',ottawa:'anglo',canberra:'anglo',berlin:'nord',vienne:'nord',amsterdam:'nord',madrid:'sud',lisbonne:'sud',rome:'sud',athenes:'sud',moscou:'est',mexico:'latam','buenos-aires':'latam',brasilia:'latam',caire:'afme',dakar:'afme',tokyo:'asie',seoul:'asie',pekin:'asiec',bangkok:'asiec'};
+const V98RED={fr:[8,40,40,12],dom:[4,30,44,22],anglo:[2,25,45,28],nord:[2,24,50,24],sud:[4,30,44,22],est:[1,15,44,40],latam:[1,18,46,35],afme:[0,6,34,60],asie:[2,22,46,30],asiec:[1,12,42,45]};
+const V98WHITE={fr:[55,45],dom:[45,55],anglo:[38,62],nord:[45,55],sud:[48,52],est:[40,60],latam:[40,60],afme:[30,70],asie:[38,62],asiec:[33,67]};
+const V98SIDEW={fr:{frites:40,puree:15,salade:15,legumes:12,riz:6,gratin:12},dom:{frites:34,puree:10,salade:14,legumes:14,riz:22,gratin:6},anglo:{frites:45,puree:18,salade:14,legumes:12,riz:5,gratin:6},nord:{frites:38,puree:20,salade:14,legumes:14,riz:6,gratin:8},sud:{frites:36,puree:12,salade:20,legumes:16,riz:10,gratin:6},est:{frites:34,puree:24,salade:12,legumes:12,riz:12,gratin:6},latam:{frites:32,puree:10,salade:18,legumes:10,riz:25,gratin:5},afme:{frites:30,puree:8,salade:16,legumes:12,riz:30,gratin:4},asie:{frites:28,puree:8,salade:12,legumes:16,riz:30,gratin:6},asiec:{frites:26,puree:6,salade:12,legumes:18,riz:34,gratin:4}};
+function v98Zone(){ try{ const l=v96Lieu(); if(V98ZONE[l.id]) return V98ZONE[l.id]; return l.g==='DOM'?'dom':'fr'; }catch(e){ return 'fr'; } }
+function v98Rand(tag){ S.pw.v98n=(S.pw.v98n||0)+1; return ivHash('v98|'+tag+'|'+S.pw.v98n+'|'+Math.round((S.t||0)*100))/4294967296; }
+function v98Pick(w,r){ const ks=Object.keys(w).filter(k=>w[k]>0); let tot=ks.reduce((a,k)=>a+w[k],0), x=r*tot; for(const k of ks){ x-=w[k]; if(x<0) return k; } return ks[ks.length-1]; }
+/* type de cuisson : bœuf = 4 cuissons ; viandes mijotées (paleron, veau en sauce, lasagnes) et viandes blanches (volaille, porc) = à point / bien cuite */
+const V98MIJOTE={lasagne:1};
+function v98CuKind(id){ const d=DISH[id]; if(!d||d.cat!=='plat'||d.bar) return null; const r=d.rec||{};
+ if(r.boeuf&&!V98MIJOTE[id]) return 'rouge'; if(r.boeuf||r.paleron||r.veau) return 'mijote'; if(r.volaille) return 'volaille'; if(r.jambon) return 'porc'; return null; }
+const v98CuOpts=k=>k==='rouge'?V98CU_ORDER:['apoint','bien'];
+const V98KIND={rouge:'viande rouge',mijote:'viande mijotée',volaille:'volaille',porc:'porc'};
+/* accompagnement : plats principaux de viande ou de poisson */
+function v98HasSide(id){ const d=DISH[id]; if(!d||d.cat!=='plat'||d.bar) return false; return !!v98CuKind(id)||!!(d.rec&&d.rec.poisson); }
+function v98SideRecAll(){ const u={}; for(const s of V98SIDE_IDS) for(const i in V98SIDES[s].rec) u[i]=Math.max(u[i]||0,V98SIDES[s].rec[i]); return u; }
+function v98SideOk(s){ const r=V98SIDES[s].rec; for(const i in r){ const st=S.stock[i]; if(!st||st.q<r[i]) return false; } return true; }
+function v98CuDraw(id){ const k=v98CuKind(id); if(!k) return null; const z=v98Zone(), r=v98Rand('cu'+id);
+ if(k==='rouge'){ const w=V98RED[z]||V98RED.fr; return v98Pick({bleue:w[0],saignante:w[1],apoint:w[2],bien:w[3]},r); }
+ const w=V98WHITE[z]||V98WHITE.fr; return v98Pick(k==='mijote'?{apoint:62,bien:38}:{apoint:w[0],bien:w[1]},r); }
+function v98SideDraw(id,kid){ const z=v98Zone(); const w=Object.assign({},V98SIDEW[z]||V98SIDEW.fr); const n=(DISH[id].n||'').toLowerCase();
+ if(/frites|pommes sautées|sautées/.test(n)) w.frites*=3; if(/riz/.test(n)) w.riz*=3; if(/purée|puree/.test(n)) w.puree*=3; if(/gratin/.test(n)) w.gratin*=3;
+ if(kid) Object.assign(w,{salade:4,legumes:6,gratin:4,riz:10});
+ for(const s of V98SIDE_IDS) if(!v98SideOk(s)) w[s]=0; if(!Object.values(w).some(x=>x>0)) return [];
+ const a=v98Pick(w,v98Rand('acc'+id)); const out=[a];
+ if(!kid&&v98Rand('acc2')<0.11){ const w2=Object.assign({},w); w2[a]=0; if(Object.values(w2).some(x=>x>0)) out.push(v98Pick(w2,v98Rand('acc3'))); }
+ return out; }
+function v98Consume(rec){ let c=0; S.day.v98ing=S.day.v98ing||{}; for(const i in rec){ const st=S.stock[i]; if(!st) continue; st.q-=rec[i]; c+=st.cost*rec[i]; S.day.v98ing[i]=(S.day.v98ing[i]||0)+rec[i]; } return c; }
+/* commande : cuisson + accompagnement(s) choisis par le client à la prise de commande */
+{ const f=takeDish; takeDish=function(id,o){ const it=f(id,o);
+ try{ if(!it||!DISH[id]||(o&&o.gift)) return it; const d=DISH[id];
+  const cu=v98CuDraw(id); if(cu){ it.cu=cu; it.cuK=v98CuKind(id); S.day.v98cu=S.day.v98cu||{}; S.day.v98cu[cu]=(S.day.v98cu[cu]||0)+1; }
+  if(v98HasSide(id)){ for(const s of V98SIDE_IDS) v96Supply(V98SIDES[s].rec,2);
+   const kid=!!(d.child||d.kids); const acc=v98SideDraw(id,kid);
+   if(!acc.length){ S.day.v98accMiss=(S.day.v98accMiss||0)+1; it.acc=[]; }
+   else { it.acc=acc; let c=0; for(const s of acc) c+=v98Consume(V98SIDES[s].rec); it.cost+=c; S.day.cogs+=c;
+    S.day.v98acc=S.day.v98acc||{}; for(const s of acc) S.day.v98acc[s]=(S.day.v98acc[s]||0)+1;
+    if(acc.length>1&&!(o&&o.res)&&it.price>0&&!d.mdjd){ it.price+=V98EXTRA; it.sup=V98EXTRA; S.day.v98sup=(S.day.v98sup||0)+V98EXTRA; S.day.v98sup2=(S.day.v98sup2||0)+1; } } }
+ }catch(e){ console.error(e); } return it; }; }
+/* temps de préparation selon la cuisson (écart modéré) */
+{ const f=finalizeOrder; finalizeOrder=function(g){ const r=f.apply(this,arguments); try{ for(const tk of S.tickets){ if(tk.g!==g.id||tk.v98||tk.bar) continue; tk.v98=1; const it=g.items[tk.i]; const k=it&&it.cu&&V98CU[it.cu]; if(k){ tk.need*=k.f; } tk.n0=tk.need; } }catch(e){ console.error(e); } return r; }; }
+/* cuisson respectée ou ratée selon le niveau du cuisinier qui a fait le ticket */
+function v98MissP(w){ let sk=3; if(w&&w!=='P'){ const s=S.staff.find(x=>x.id===w); sk=s?(s.role==='cook'?s.skill:Math.min(2,s.skill)):3; } return clamp(0.16-0.018*sk,0.01,0.15); }
+{ const f=completeTicket; completeTicket=function(tk){ try{ const g=G(tk.g), it=g&&g.items[tk.i]; if(it&&it.cu&&it.cuOk==null){ const s=tk.w&&tk.w!=='P'?S.staff.find(x=>x.id===tk.w):null; it.cook=s?s.name:'Le patron';
+   const miss=ivHash('v98m|'+g.id+'|'+tk.i+'|'+Math.round(S.t*10))/4294967296<v98MissP(tk.w);
+   if(miss){ const op=v98CuOpts(it.cuK), k=op.indexOf(it.cu); const up=ivHash('v98d|'+g.id+'|'+tk.i)%100<65; let j=up?k+1:k-1; if(j<0||j>=op.length) j=up?k-1:k+1; it.cuGot=op[clamp(j,0,op.length-1)]; it.cuOk=false; S.day.v98miss=(S.day.v98miss||0)+1; }
+   else { it.cuOk=true; it.cuGot=it.cu; S.day.v98ok=(S.day.v98ok||0)+1; } } }catch(e){ console.error(e); } return f.apply(this,arguments); }; }
+/* « Fait maison » + cuissons : petits effets sur la note du client */
+const V98FM_BONUS=0.05;
+function v98CuEffect(g){ let ok=0,miss=0; for(const it of (g&&g.items)||[]){ if(!it||!it.cu||it.cuOk==null) continue; if(it.cuOk) ok++; else miss++; } return {ok,miss,d:Math.min(0.12,0.04*ok)-Math.min(0.6,0.3*miss)}; }
+{ const f=judge; judge=function(g){ const r=f(g); try{ if(g&&g.items&&g.items.some(i=>i&&DISH[i.d]&&!DISH[i.d].bar)){ const e=v98CuEffect(g); r.stars=clamp(r.stars+V98FM_BONUS+e.d,1,5); r.v98={fm:V98FM_BONUS,cu:e}; } }catch(e){ console.error(e); } return r; }; }
+const v98CuLab=(c)=>V98CU[c]?V98CU[c].n:'';
+function v98CuSentence(g){ const items=((g&&g.items)||[]).filter(it=>it&&it.cu&&it.cuOk!=null); if(!items.length) return '';
+ const bad=items.find(it=>it.cuOk===false); const low=s=>s.toLowerCase();
+ if(bad) return ' Cuisson ratée ('+DISH[bad.d].n+') : demandée « '+low(v98CuLab(bad.cu))+' », servie « '+low(v98CuLab(bad.cuGot))+' ».';
+ const okIt=items[0]; return ivHash('v98r|'+g.id)%100<35?' Cuisson « '+low(v98CuLab(okIt.cu))+' » parfaitement respectée ('+DISH[okIt.d].n+').':''; }
+{ const f=postReview; postReview=function(stars,text,g){ const old=S.reviews&&S.reviews[0]; const r=f.apply(this,arguments); try{ const rv=S.reviews&&S.reviews[0]; if(rv&&rv!==old&&g&&!g.preo){ const add=v98CuSentence(g); if(add&&!String(rv.t).includes('Cuisson')){ rv.t=String(rv.t)+add; rv.v98cu=1; } } }catch(e){ console.error(e); } return r; }; }
+/* stock : usages et plafonds intègrent les accompagnements → commande automatique et réassort express */
+function v98SidesOnCarte(){ try{ return Object.keys(DISH).some(id=>S.menu[id]&&S.menu[id].on&&!dishLocked(id)&&v98HasSide(id)); }catch(e){ return false; } }
+{ const f=carteUse; carteUse=function(){ const u=f(); if(v98SidesOnCarte()) for(const i in v98SideRecAll()) u[i]=(u[i]||0)+1; return u; }; }
+{ const f=needOf; needOf=function(i){ let n=f(i); if(v98SidesOnCarte()){ const r=v98SideRecAll(); if(r[i]) n=Math.max(n,r[i]); } return n; }; }
+stockUsageDay=function(){
+  const pw=S.pw; pw.use=pw.use||{}; pw.soldI=pw.soldI||{}; pw.useN=pw.useN||{}; const today={};
+  for(const id in S.day.sales){ const n=S.day.sales[id]; if(!DISH[id]) continue; for(const i in DISH[id].rec){ today[i]=(today[i]||0)+n*DISH[id].rec[i]; pw.soldI[i]=(pw.soldI[i]||0)+n*DISH[id].rec[i]; } }
+  const x=S.day.v98ing||{}; for(const i in x){ today[i]=(today[i]||0)+x[i]; pw.soldI[i]=(pw.soldI[i]||0)+x[i]; }
+  if(closedNow()) return;
+  try{ if(S.trav&&worksNow()) return; }catch(e){} /* v9.8 : pas de prévision qui s'effondre pendant des travaux / un déménagement */
+  const F=Math.max(0.3,fcF(dayNum()));
+  for(const i in ING){ const t=today[i]||0; pw.use[i]=pw.use[i]==null?t:(0.6*pw.use[i]+0.4*t); pw.useN[i]=pw.useN[i]==null?t/F:(0.6*pw.useN[i]+0.4*t/F); } };
+/* migration v9.8 (idempotente) : stocks/commandes auto des nouveaux produits + signature */
+function v98Migrate(s){ if(!s) return s; s.pw=s.pw||{};
+ for(const i in ING){ if(s.stock&&!s.stock[i]) s.stock[i]={q:0,qual:3.4,cost:ING[i].p,or:1}; if(s.auto&&!s.auto[i]) s.auto[i]={on:true,sup:'marche',qty:24}; }
+ if(!s.pw.v98){ s.pw.v98=1; s.pw.v98q=s.pw.v98q||[]; s.pw.v98new=s.pw.v98new||{}; try{ v98SigMigrate(s); }catch(e){ console.error(e); } }
+ return s; }
+{ const f=newState; newState=function(){ const s=f.apply(this,arguments); try{ s.pw=s.pw||{}; s.pw.sig=s.pw.sig||{entree:null,plat:null,dessert:null,src:'nouvelle partie'}; v98Migrate(s); }catch(e){ console.error(e); } return s; }; }
+{ const f=fixSave; fixSave=function(){ const r=f.apply(this,arguments); try{ v98Migrate(S); }catch(e){ console.error(e); } return r; }; }
+/* réassort : les garnitures fraîches (salade, légumes) visent au moins 1,6 jour de ventes prévues */
+{ const f=autoTarget; autoTarget=function(i){ const t=f.apply(this,arguments); try{ if(V98ING[i]&&t>0&&v98SidesOnCarte()){ const d0=(S.trav&&worksNow())?S.trav.end+1:dayNum(); const u=v9DayUse(i,d0)+0.6*v9DayUse(i,d0+1); return Math.min(capOf(i),Math.max(t,Math.ceil(u))); } }catch(e){} return t; }; }
+
+/* ===== v9.8 part b ===== */
+/* v9.8 b — plats débloqués : fenêtre Ajouter / Remplacer / Plus tard (formation, saison, spécialités après déménagement). */
+const V98SRC={formation:{e:'🎓',t1:'Nouveau plat débloqué',tn:n=>n+' nouveaux plats débloqués'},saison:{e:'🍂',t1:'Nouveau plat de saison',tn:n=>n+' plats de saison disponibles'},local:{e:'📍',t1:'Spécialité locale disponible',tn:n=>n+' spécialités locales disponibles'}};
+const v98Cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
+function v98Pending(id){ const d=DISH[id], m=S.menu[id]; return !!(d&&m&&!m.on&&d.cat!=='boisson'&&!d.bar&&!d.mdjd&&!d.fest&&!dishLocked(id)); }
+function v98Queue(ids,src,ctx){ try{ if(!S||!S.pw) return null; if(phaseV6()!=='open'||dayNum()<OPEN_DAY) return null; /* pas de fenêtre avant l'ouverture */
+ S.pw.v98q=S.pw.v98q||[]; const busy=new Set(S.pw.v98q.flatMap(e=>e.ids)); const L=[...new Set(ids)].filter(id=>v98Pending(id)&&!busy.has(id)); if(!L.length) return null;
+ const e=Object.assign({key:'u'+dayNum()+'_'+src+'_'+(S.pw.v98qn=(S.pw.v98qn||0)+1),src,ids:L,day:dayNum()},ctx||{}); S.pw.v98q.push(e); return e; }catch(err){ console.error(err); return null; } }
+function v98Clean(){ const q=S.pw.v98q||[]; for(const e of q) e.ids=e.ids.filter(v98Pending); S.pw.v98q=q.filter(e=>e.ids.length); return S.pw.v98q; }
+function v98Done(e,id){ const q=S.pw.v98q||[]; const x=q.find(y=>y.key===e.key); if(x){ x.ids=id?x.ids.filter(i=>i!==id):[]; } S.pw.v98q=q.filter(y=>y.ids.length); if(ui.v98g&&ui.v98g.key===e.key) ui.v98g=null; }
+function v98Add(id){ const m=S.menu[id]; if(!m) return; m.on=true; m.price=DISH[id].ref; if(S.pw.v98new) delete S.pw.v98new[id]; }
+function v98Replace(nw,old){ if(!DISH[nw]||!DISH[old]||DISH[nw].cat!==DISH[old].cat||!S.menu[old]||!S.menu[old].on) return false; S.menu[old].on=false; v98Add(nw); return true; }
+function v98Later(id){ S.pw.v98new=S.pw.v98new||{}; S.pw.v98new[id]=1; }
+const v98MonS=i=>((S.pw.mon||{})[monthKey(dayNum())]||{})[i]||0;
+const v98Marge=i=>{ const p=S.menu[i]&&S.menu[i].on?S.menu[i].price:DISH[i].ref; return p>0?Math.round((p-dishCost(i))/p*100):0; };
+function v98CarteCat(cat){ return carteDishes().filter(i=>DISH[i].cat===cat).sort((a,b)=>v98MonS(a)-v98MonS(b)||DISH[a].n.localeCompare(DISH[b].n,'fr')); }
+function v98Mini(i,extra){ const d=DISH[i];
+ return card('','<div class="row"><span class="em">'+d.e+'</span><div class="grow"><b>'+d.n+'</b><small>'+CATS[d.cat]+' · préparation '+String(d.prep).replace('.',',')+' min · prix conseillé '+money2(d.ref)+'</small></div></div>'+
+  '<div class="chips"><span class="chip">Coût '+money2(dishCost(i))+'</span><span class="chip ok">Marge ≈ '+v98Marge(i)+' %</span>'+(d.veg?'<span class="chip ok">🌱 végé</span>':'')+(d.gf?'<span class="chip ok">🌾 sans gluten</span>':'')+(d.season?'<span class="chip ok">🍂 de saison</span>':'')+(d.v96local?'<span class="chip ok">📍 spécialité locale</span>':'')+algChips(i)+'</div>'+
+  '<div class="chips"><small>🧾 '+ingList(i)+'</small></div>'+(extra||''),'dish'); }
+function v98CntChips(add){ const c=Object.assign({},carteCnt()); for(const i of add||[]) if(c[DISH[i].cat]!=null) c[DISH[i].cat]++; return '<div class="chips">'+['entree','plat','dessert'].map(k=>'<span class="chip '+(c[k]>=CARTE_MIN[k]?'ok':'bad')+'">'+CATS[k]+'s '+c[k]+' · min. '+CARTE_MIN[k]+'</span>').join('')+'</div>'; }
+function v98Intro(e,n){ const ch=chefs().ch; const who={e:'👨‍🍳',n:ch?ch.name+' (chef)':'Le chef'};
+ if(e.src==='formation') return n>1?dialogue(who,'« '+(e.who||'Notre cuisinier')+' maîtrise « '+(e.skill||'une nouvelle technique')+' » : '+n+' recettes possibles. Choisissez pour chacune. »'):'<p>'+(e.who||'Notre cuisinier')+' maîtrise désormais « <b>'+(e.skill||'une nouvelle technique')+'</b> ». Une nouvelle recette est disponible :</p>';
+ if(e.src==='saison') return n>1?dialogue(who,'« '+v98Cap(MOIS[e.mo!=null?e.mo:calMonth()])+' commence : ces recettes sont de saison. Choisissez pour chacune. La réunion de saison de fin de mois reste prévue. »'):'<p>'+v98Cap(MOIS[e.mo!=null?e.mo:calMonth()])+' commence : cette recette de saison est disponible (la réunion de saison de fin de mois reste prévue).</p>';
+ return n>1?dialogue(who,'« Nous voici à '+(e.city||v96Lieu().n)+' : voici les spécialités du coin. Choisissez pour chacune. »'):'<p>Installé à '+(e.city||v96Lieu().n)+' : cette spécialité locale est disponible.</p>'; }
+function v98Title(e,n){ const S0=V98SRC[e.src]||V98SRC.formation; if(e.src==='local') return n>1?'Spécialités de '+(e.city||v96Lieu().n):'Spécialité de '+(e.city||v96Lieu().n); return n>1?S0.tn(n):S0.t1; }
+/* m1 : un seul plat */
+function v98One(e,id){ const d=DISH[id], c=carteCnt(), cat=d.cat, n=c[cat]||0;
+ showPopup({now:true,v98:e.key,icon:(V98SRC[e.src]||V98SRC.formation).e,title:v98Title(e,1),wide:true,body:v98Intro(e,1)+v98Mini(id)+'<p class="muted">Carte actuelle : <b>'+n+' '+CATS[cat].toLowerCase()+'s</b> (min. '+CARTE_MIN[cat]+') · modifiable ensuite dans Carte › Composer la carte.</p>',
+  choices:[{label:'➕ Ajouter à la carte',sub:'La carte passe à '+(n+1)+' '+CATS[cat].toLowerCase()+'s · prix conseillé '+money2(d.ref),cb(){ v98Add(id); v98Done(e,id); note('➕ '+d.n+' ajouté à la carte.','good'); }},
+   {label:'🔁 Remplacer un plat',sub:n?'Retirer un des '+n+' '+CATS[cat].toLowerCase()+'s actuels':'Aucun plat de cette catégorie à remplacer',cls:'ghost',cb(){ if(n) v98Rep(e,id); else v98One(e,id); }},
+   {label:'⏰ Plus tard',sub:'Le plat reste dans la bibliothèque, marqué 🆕',cls:'ghost',cb(){ v98Later(id); v98Done(e,id); }}]}); }
+/* m1b : choix du plat remplacé */
+function v98Rep(e,id){ const d=DISH[id], L=v98CarteCat(d.cat); const sg=(typeof v98Sig==='function')?v98Sig(d.cat):null;
+ const rows=L.map((i,k)=>'<div class="row" style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);text-align:left"><span class="em">'+DISH[i].e+'</span><div class="grow" style="flex:1;min-width:0"><b>'+DISH[i].n+'</b> '+(i===sg?'<span class="chip v98sig">⭐ Signature</span>':'')+(k===0?' <span class="chip warn">suggestion du chef : moins vendu</span>':'')+'<br><small>'+v98MonS(i)+' vendus en '+MOIS[ymd(dayNum()).m]+' · marge '+v98Marge(i)+' % · qualité '+starsH(estQuality(i))+'</small></div>'+btn('Remplacer','v98rep',id,i,k===0?'primary sm':'ghost sm')+'</div>').join('');
+ showPopup({now:true,v98:e.key,v98e:e,icon:'🔁',title:'Remplacer quel plat ?',wide:true,body:'<p>➕ '+d.e+' <b>'+d.n+'</b> prendra la place du plat choisi, au prix conseillé '+money2(d.ref)+'.</p><div class="card" style="text-align:left">'+rows+'</div><p class="muted">Seuls les plats de la même catégorie sont proposés : la carte garde '+L.length+' '+CATS[d.cat].toLowerCase()+'s (minimum '+CARTE_MIN[d.cat]+' respecté). Une signature peut aussi être remplacée : elle perd alors son badge jusqu’à la fin du mois.</p>',
+  choices:[{label:'‹ Retour',cls:'ghost',cb(){ v98One(e,id); }}]}); }
+/* m2 : plusieurs plats en une fenêtre */
+function v98GroupState(e){ if(!ui.v98g||ui.v98g.key!==e.key){ ui.v98g={key:e.key,ch:{}}; for(const id of e.ids) ui.v98g.ch[id]={a:'add',rep:null}; } const st=ui.v98g;
+ for(const id of e.ids) if(!st.ch[id]) st.ch[id]={a:'add',rep:null};
+ const used=new Set(); for(const id of e.ids){ const c=st.ch[id]; if(c.a!=='rep') continue; const L=v98CarteCat(DISH[id].cat).filter(x=>!used.has(x)); if(!L.length){ c.a='add'; c.rep=null; continue; } if(!c.rep||!L.includes(c.rep)) c.rep=L[0]; used.add(c.rep); }
+ return st; }
+function v98GroupSum(e,st){ let a=0,r=0,l=0; for(const id of e.ids){ const c=st.ch[id].a; if(c==='add') a++; else if(c==='rep') r++; else l++; } return a+' ajout'+(a>1?'s':'')+' · '+r+' remplacement'+(r>1?'s':'')+' · '+l+' plus tard'; }
+function v98GroupBody(e){ const st=v98GroupState(e); const usedBy={}; for(const id of e.ids){ const c=st.ch[id]; if(c.a==='rep'&&c.rep) usedBy[c.rep]=id; }
+ const rows=e.ids.map(id=>{ const c=st.ch[id], cat=DISH[id].cat; const L=v98CarteCat(cat).filter(x=>!usedBy[x]||usedBy[x]===id);
+  const sel=c.a==='rep'?'<select class="sl" data-v98rep="'+id+'" aria-label="Plat remplacé" style="max-width:100%;flex:1 1 220px">'+L.map(x=>'<option value="'+x+'"'+(x===c.rep?' selected':'')+'>'+DISH[x].e+' '+DISH[x].n+' — '+v98MonS(x)+' vendus'+((typeof v98Sig==='function'&&v98Sig(cat)===x)?' ⭐':'')+'</option>').join('')+'</select>':'';
+  return v98Mini(id,'<div class="btnrow" style="align-items:center;flex-wrap:wrap">'+btn('➕ Ajouter','v98gc',id,'add',c.a==='add'?'primary sm':'ghost sm')+btn('🔁 Remplacer','v98gc',id,'rep',c.a==='rep'?'primary sm':'ghost sm',!v98CarteCat(cat).length)+sel+btn('⏰ Plus tard','v98gc',id,'later',c.a==='later'?'primary sm':'ghost sm')+'</div>'); }).join('');
+ const adds=e.ids.filter(id=>st.ch[id].a==='add');
+ return '<div style="text-align:left">'+v98Intro(e,e.ids.length)+'</div>'+rows+'<div style="text-align:left"><b>Après vos choix</b>'+v98CntChips(adds)+'<small class="muted">Un remplacement ne peut jamais faire passer une catégorie sous son minimum ; les ajouts n’ont pas de maximum.</small></div>'; }
+function v98Group(e){ const st=v98GroupState(e);
+ showPopup({now:true,v98:e.key,v98e:e,icon:(V98SRC[e.src]||V98SRC.formation).e,title:v98Title(e,e.ids.length),wide:true,body:v98GroupBody(e),
+  choices:[{label:'Valider mes choix ✔',sub:v98GroupSum(e,st),cb(){ v98GroupApply(e); }},{label:'Tout plus tard',sub:'Les plats restent dans la bibliothèque, marqués 🆕',cls:'ghost',cb(){ for(const id of e.ids) v98Later(id); v98Done(e); }}]}); }
+function v98GroupApply(e){ const st=v98GroupState(e); let a=0,r=0; for(const id of e.ids.slice()){ const c=st.ch[id]; if(!v98Pending(id)) continue;
+  if(c.a==='add'){ v98Add(id); a++; } else if(c.a==='rep'&&c.rep&&v98Replace(id,c.rep)) r++; else v98Later(id); }
+ v98Done(e); note('🍴 Carte mise à jour : '+a+' ajout(s), '+r+' remplacement(s).','good'); }
+function v98Repaint(){ const o=ui.modal; if(!o||!o.v98e) return; const e=(S.pw.v98q||[]).find(x=>x.key===o.v98e.key); if(!e) return; o.v98e=e; if(o.title===undefined) return;
+ if(o.choices&&o.choices[0]&&/Valider mes choix/.test(o.choices[0].label)){ o.body=v98GroupBody(e); o.choices[0].sub=v98GroupSum(e,v98GroupState(e)); }
+ const m=$('#modal'), sh=m.querySelector('.sheet'), y=sh?sh.scrollTop:0; const mb=m.querySelector('.mb'); if(mb) mb.innerHTML=o.body; const sm=m.querySelector('.mc [data-ci="0"] small'); if(sm&&o.choices[0].sub) sm.textContent=o.choices[0].sub; if(sh) sh.scrollTop=y; }
+Object.assign(ACT,{
+ v98gc(id,a){ const o=ui.modal; if(!o||!o.v98e) return; const st=v98GroupState(o.v98e); if(st.ch[id]){ st.ch[id].a=a; if(a!=='rep') st.ch[id].rep=null; } v98Repaint(); },
+ v98rep(nw,old){ const o=ui.modal; const e=o&&o.v98e; const ok=v98Replace(nw,old); if(e) v98Done(e,nw); if(ok) note('🔁 '+DISH[nw].n+' remplace '+DISH[old].n+'.','good'); ui.modal=null; nextPopup(); }
+});
+document.addEventListener('change',ev=>{ const el=ev.target&&ev.target.closest&&ev.target.closest('[data-v98rep]'); if(!el) return; const o=ui.modal; if(!o||!o.v98e) return; const st=v98GroupState(o.v98e); const c=st.ch[el.dataset.v98rep]; if(c){ c.rep=el.value; } v98Repaint(); });
+function v98Show(e){ if(e.ids.length===1) v98One(e,e.ids[0]); else v98Group(e); }
+function v98Pump(){ try{ if(!S||!S.pw||S.over) return; if(S.pw.j0) return; const v=document.getElementById('v96screen'); if(v&&!v.hidden) return;
+  if((ui.modal&&ui.modal.v98)||ui.mq.some(o=>o.v98)) return; if(screenBusy()) return;
+  if(typeof v98SigPump==='function'&&v98SigPump()) return;
+  const q=v98Clean(); if(q.length) v98Show(q[0]); }catch(e){ console.error(e); } }
+setInterval(v98Pump,700);
+/* sources */
+{ const f=finishTraining; finishTraining=function(s){ const before=Object.assign({},S.learned||{}); const T=s&&s.trn; const r=f.apply(this,arguments);
+ try{ const nw=Object.keys(S.learned||{}).filter(k=>S.learned[k]&&!before[k]); if(nw.length){ const ids=Object.keys(DISH).filter(i=>DISH[i].sk&&nw.includes(DISH[i].sk)); v98Queue(ids,'formation',{who:s.name,skill:nw.map(k=>SKILLS[k]?SKILLS[k].n:k).join(', ')}); } }catch(e){ console.error(e); } return r; }; }
+function v98SeasonCheck(){ try{ const d=dayNum(); if(ymd(d).dd!==1) return null; const mk=monthKey(d); S.pw.v98sm=S.pw.v98sm||{}; if(S.pw.v98sm[mk]) return null; S.pw.v98sm[mk]=1;
+ const mo=calMonth(d), prev=calMonth(d-1); const ids=libFood().filter(i=>{ const s=DISH[i].season; return s&&s.includes(mo)&&!s.includes(prev); });
+ return v98Queue(ids,'saison',{mo:ymd(d).m}); }catch(e){ console.error(e); return null; } }
+{ const f=nextDay; nextDay=function(){ const r=f.apply(this,arguments); v98SeasonCheck(); return r; }; }
+{ const f=v8TravStart; v8TravStart=function(T){ const r=f.apply(this,arguments); try{ if(T&&T.v96move){ const l=v96Lieu(); const ids=l.ids.filter(id=>DISH[id].cat!=='boisson'); const off=[]; for(const id of ids) if(S.menu[id]&&S.menu[id].on){ S.menu[id].on=false; off.push(id); } /* CARTE_MIN : on garde à la carte les spécialités nécessaires au minimum (hors fenêtre) */ for(const id of off){ const c=DISH[id].cat; if(CARTE_MIN[c]!=null&&(carteCnt()[c]||0)<CARTE_MIN[c]) S.menu[id].on=true; } v98Queue(ids,'local',{city:l.n}); } }catch(e){ console.error(e); } return r; }; }
+{ const f=A_toggle; A_toggle=function(id){ const r=f.apply(this,arguments); try{ if(S.menu[id]&&S.menu[id].on&&S.pw.v98new) delete S.pw.v98new[id]; }catch(e){} return r; }; }
+
+/* ===== v9.8 part c ===== */
+/* v9.8 c — signature du mois (entrée, plat, dessert) ; boissons : 5 favoris inchangés. */
+const v98De=l=>(/^[aeiouyéèêh]/i.test(l)?'d’':'de ')+l;
+const V98SIGC=['entree','plat','dessert'], V98SIG_W=1.15, V98ICON={entree:'🥗',plat:'🍽️',dessert:'🍰'};
+const v98OnC=i=>!!(DISH[i]&&S.menu[i]&&S.menu[i].on&&!dishLocked(i)&&!DISH[i].mdjd&&!DISH[i].fest&&!DISH[i].bar&&DISH[i].cat!=='boisson');
+function v98SigMigrate(s){ const pw=s.pw; if(pw.sig) return; const o={entree:null,plat:null,dessert:null,src:'migration'};
+ let fav=pw.fav; if(!fav&&s===S&&typeof favCompute==='function'){ try{ fav=favCompute(monSales(monthKey(dayNum()))); }catch(e){ fav=null; } } if(!fav){ try{ const mk=(()=>{ const t=s.t||0; return monthKey(Math.floor(t/1440)+1); })(); const sales=((pw.mon||{})[mk])||{}; fav={}; for(const c of V98SIGC) fav[c]=Object.keys(sales).filter(i=>DISH[i]&&DISH[i].cat===c&&!DISH[i].mdjd&&!DISH[i].fest&&sales[i]>0).sort((a,b)=>sales[b]-sales[a]); }catch(e){ fav={}; } }
+ for(const c of V98SIGC){ const id=fav&&fav[c]&&fav[c][0]; if(id&&DISH[id]&&s.menu&&s.menu[id]&&s.menu[id].on) o[c]=id; }
+ pw.sig=o; pw.sigLost={}; }
+/* lecture : une signature retirée de la carte est perdue jusqu'à la fin du mois */
+function v98Sig(cat){ const pw=S&&S.pw; if(!pw||!pw.sig) return null; const id=pw.sig[cat]; if(!id) return null; if(!v98OnC(id)){ pw.sig[cat]=null; pw.sigLost=pw.sigLost||{}; pw.sigLost[cat]=id; return null; } return id; }
+function v98SigAll(){ const o={}; for(const c of V98SIGC) o[c]=v98Sig(c); return o; }
+const v98IsSig=i=>!!(DISH[i]&&V98SIGC.includes(DISH[i].cat)&&v98Sig(DISH[i].cat)===i);
+function v98W(i){ try{ return v98IsSig(i)?V98SIG_W:1; }catch(e){ return 1; } }
+const v98UnitM=i=>(S.menu[i]&&S.menu[i].price||DISH[i].ref)-dishCost(i);
+function v98SigPropose(sales){ const o={}; for(const c of V98SIGC){ const L=Object.keys(DISH).filter(i=>DISH[i].cat===c&&v98OnC(i)); L.sort((a,b)=>(sales[b]||0)-(sales[a]||0)||v98UnitM(b)-v98UnitM(a)||DISH[a].n.localeCompare(DISH[b].n,'fr')); o[c]=L[0]||null; } return o; }
+const v98SigOpen=()=>!!(S.pw.sigOpenUntil!=null&&dayNum()<=S.pw.sigOpenUntil);
+const v98NextMo=mk=>MOIS[(mk+1)%12];
+{ const f=v7MonthReport; v7MonthReport=function(){ const due=S.pw&&S.pw.repDue; const n0=(S.pw.repH||[]).length; const r=f.apply(this,arguments);
+ try{ const H=S.pw.repH||[]; if(due&&H.length>n0&&H[0].mk===due.mk){ const sales=monSales(due.mk); const prop=v98SigPropose(sales); H[0].sig=Object.assign({},prop); H[0].drinkFav=(H[0].fav&&H[0].fav.boisson)||[];
+   S.pw.sigProp=Object.assign({},prop); S.pw.sig=Object.assign({src:'chef',mk:due.mk+1},prop); S.pw.sigLost={}; S.pw.sigOpenUntil=dayNum()+3; S.pw.sigAsk=due.mk; } }catch(e){ console.error(e); } return r; }; }
+function v98SigPump(){ const pw=S.pw; if(pw.sigAsk==null) return false; if(!v98SigOpen()){ pw.sigAsk=null; return false; } const mk=pw.sigAsk, s=v98SigAll();
+ const rows=V98SIGC.map(c=>'<div class="row" style="display:flex;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line);text-align:left"><small style="width:84px">'+V98ICON[c]+' '+CATS[c]+'</small><span style="flex:1;min-width:0">'+(s[c]?'<b>'+DISH[s[c]].e+' '+DISH[s[c]].n+'</b> <small>· '+(monSales(mk)[s[c]]||0)+' vendus</small>':'<small class="muted">aucun plat à la carte</small>')+'</span></div>').join('');
+ showPopup({v98:'sig'+mk,icon:'⭐',title:'Signatures '+v98De(v98NextMo(mk)),wide:true,body:dialogue({e:'👨‍🍳',n:(chefs().ch?chefs().ch.name+' (chef)':'Le chef')},'« Le mois '+v98De(MOIS[mk%12])+' est clos. Je vous propose nos <b>meilleures ventes</b> comme signatures '+v98De(v98NextMo(mk))+'. »')+'<div class="card">'+rows+'</div><p class="muted">Un plat signature est un peu plus choisi par les clients (≈ +15 %). Il n’est pas protégé à la réunion de saison.</p>',
+  choices:[{label:'✔ Garder les propositions du chef',cb(){ pw.sigAsk=null; }},{label:'✏️ Choisir moi-même',sub:'Parmi les plats à la carte',cls:'ghost',cb(){ pw.sigAsk=null; panelOpen('v98sig'); }}]});
+ return true; }
+/* m3 : panneau de choix */
+PANELS.v98sig={t:()=>'⭐ Signatures '+v98De(v98NextMo((S.pw.sig&&S.pw.sig.mk!=null?S.pw.sig.mk-1:monthKey(dayNum())-1))),f(){ const pw=S.pw, s=v98SigAll(), mk=pw.sig&&pw.sig.mk!=null?pw.sig.mk-1:monthKey(dayNum())-1, sales=monSales(mk), prop=pw.sigProp||{}, open=v98SigOpen();
+ let h='<div class="card">'+dialogue({e:'👨‍🍳',n:(chefs().ch?chefs().ch.name+' (chef)':'Le chef')},'« Le mois '+v98De(MOIS[mk%12])+' est clos. Je vous propose nos <b>meilleures ventes</b> comme signatures '+v98De(v98NextMo(mk))+'. Vous pouvez en choisir une autre parmi les plats à la carte. »')+'</div>';
+ h+='<div class="card"><h3>Une signature par catégorie</h3>'+V98SIGC.map(c=>{ const L=Object.keys(DISH).filter(i=>DISH[i].cat===c&&v98OnC(i)).sort((a,b)=>(sales[b]||0)-(sales[a]||0)||v98UnitM(b)-v98UnitM(a)||DISH[a].n.localeCompare(DISH[b].n,'fr'));
+   return '<div class="row" style="padding:7px 0;border-top:1px solid var(--line)"><small>'+V98ICON[c]+' '+CATS[c]+'</small><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="flex:1 1 220px;min-width:0">'+(prop[c]&&DISH[prop[c]]?'Proposé par le chef : <b>'+DISH[prop[c]].e+' '+DISH[prop[c]].n+'</b> <small>· '+(sales[prop[c]]||0)+' vendus</small>':'<small class="muted">Pas de proposition</small>')+'</span>'+
+   (L.length?'<select class="sl" data-v98sig="'+c+'" aria-label="Signature '+CATS[c]+'" style="flex:1 1 220px;max-width:100%"'+(open?'':' disabled')+'>'+(s[c]?'':'<option value="" selected>— aucune —</option>')+L.map(i=>'<option value="'+i+'"'+(i===s[c]?' selected':'')+'>'+DISH[i].e+' '+DISH[i].n+' — '+(sales[i]||0)+' vendus</option>').join('')+'</select>':'<small class="muted">Aucun plat de cette catégorie à la carte.</small>')+'</div></div>'; }).join('')+
+   '<p class="muted">Effet : un plat signature est un peu plus choisi par les clients (bonus modéré, ≈ +15 %, cumulable avec le plat préféré d’un habitué). Il n’est <b>pas protégé</b> : la réunion de saison peut le remplacer ; une signature retirée laisse la catégorie sans signature jusqu’à la fin du mois.'+(open?' Choix possible jusqu’au '+dateLong(pw.sigOpenUntil)+'.':' Prochain choix : fin '+v98De(MOIS[ymd(dayNum()).m])+'.')+'</p></div>';
+ const df=((pw.fav&&pw.fav.boisson)||favNow().boisson||[]);
+ h+='<div class="card"><h3>🥂 Boissons : 5 favoris (inchangé)</h3><div class="chips">'+(df.length?df.map(i=>'<span class="chip">'+DISH[i].e+' '+DISH[i].n+'</span>').join(''):'<small class="muted">— pas encore de ventes —</small>')+'</div></div>';
+ return h+'<div class="btnrow">'+btn('Valider les signatures ✔','v98sigok',null,null,'primary',!open)+btn('Garder les propositions du chef','v98sigchef',null,null,'ghost',!open)+'</div>'; }};
+Object.assign(ACT,{
+ v98sigset(c,id){ if(!v98SigOpen()) return; if(id&&!(v98OnC(id)&&DISH[id].cat===c)) return; S.pw.sig=S.pw.sig||{}; S.pw.sig[c]=id||null; S.pw.sig.src='joueur'; if(S.pw.sigLost) delete S.pw.sigLost[c]; },
+ v98sigok(){ S.pw.sigOpenUntil=dayNum()-1; S.pw.sigAsk=null; panelClose(); note('⭐ Signatures du mois validées : '+V98SIGC.map(c=>v98Sig(c)?DISH[v98Sig(c)].n:'—').join(' · ')+'.','good'); },
+ v98sigchef(){ const p=S.pw.sigProp||{}; for(const c of V98SIGC) if(p[c]&&v98OnC(p[c])) S.pw.sig[c]=p[c]; S.pw.sig.src='chef'; ACT.v98sigok(); },
+ v98sigpanel(){ panelOpen('v98sig'); }
+});
+document.addEventListener('change',ev=>{ const el=ev.target&&ev.target.closest&&ev.target.closest('[data-v98sig]'); if(!el) return; ACT.v98sigset(el.dataset.v98sig,el.value); try{ panelRender(true); }catch(e){} });
+/* badge carte (m4) + 🆕 bibliothèque */
+{ const f=dishCard; dishCard=function(id,drink){ let h=f.apply(this,arguments); try{ if(!h||drink) return h; if(v98IsSig(id)) h=h.replace(/(<div class="grow"><b>[^<]*<\/b>)/,'$1 <span class="chip v98sig">⭐ Signature</span>').replace(/(<div class="chips">)/,'$1<span class="chip ok">⭐ Signature '+v98De(MOIS[ymd(dayNum()).m])+' · un peu plus choisie</span>');
+   else if(S.pw.v98new&&S.pw.v98new[id]&&S.menu[id]&&!S.menu[id].on) h=h.replace(/(<div class="grow"><b>[^<]*<\/b>)/,'$1 <span class="chip warn">🆕 nouveau</span>'); }catch(e){ console.error(e); } return h; }; }
+function v98SigCard(){ const s=v98SigAll(), lost=S.pw.sigLost||{};
+ return card('⭐ Signatures du mois','<div class="chips">'+V98SIGC.map(c=>s[c]?'<span class="chip">'+DISH[s[c]].e+' '+CATS[c]+' : '+DISH[s[c]].n+'</span>':'<span class="chip warn">'+V98ICON[c]+' '+CATS[c]+' : aucune'+(lost[c]&&DISH[lost[c]]?' (retirée)':'')+'</span>').join('')+'</div><small class="muted">Choisies au rapport de fin de mois · '+(v98SigOpen()?'modifiables jusqu’au '+dateLong(S.pw.sigOpenUntil)+'.':'prochain choix fin '+MOIS[ymd(dayNum()).m]+'.')+'</small>'+(v98SigOpen()?'<div class="btnrow">'+btn('Changer','v98sigpanel',null,null,'ghost sm')+'</div>':'')); }
+/* rapports (m5a) */
+const v98RepSig=r=>{ if(r.sig) return r.sig; const o={}; for(const c of V98SIGC) o[c]=r.fav&&r.fav[c]&&r.fav[c][0]||null; return o; };
+repCard=function(r,cur){ const sg=v98RepSig(r), sl=Object.values(sg).filter(Boolean), df=(r.fav&&r.fav.boisson)||[];
+ return '<div class="card'+(cur?' cardok':'')+'"><h3>📊 Rapport '+v98De(mkLabel(r.mk))+'</h3><p class="muted" style="margin:0 0 4px">'+r.tot+' articles vendus · CA '+fm(r.rev)+' · résultat '+fm(r.profit)+' sur '+r.nd+' jours <small>(arrêté le '+dateStr(r.day)+')</small></p>'
+  +'<h4>🏆 Top 10 des ventes</h4>'+r.top.map((x,k)=>rankRow(x[0],x[1],k+1,sl.concat(df))).join('')+'<h4>📉 5 moins vendus (à la carte)</h4>'+r.flop.map((x,k)=>rankRow(x[0],x[1],k+1)).join('')
+  +'<h4>⭐ Signatures retenues'+(r.sig?'':' <small>(ancien favori n°1)</small>')+'</h4><div class="chips">'+V98SIGC.map(c=>'<span class="chip">'+V98ICON[c]+' '+(sg[c]&&DISH[sg[c]]?DISH[sg[c]].n:'—')+'</span>').join('')+'</div>'
+  +'<h4>🥂 5 favoris boissons</h4><div class="chips">'+(df.length?df.map(i=>'<span class="chip">'+DISH[i].e+' '+DISH[i].n+'</span>').join(''):'<small class="muted">— pas de ventes —</small>')+'</div>'+(r.v98?'<h4>🍟 Accompagnements et cuissons</h4><p class="muted">'+v98RepLine(r.v98)+'</p>':'')+'</div>'; };
+repHomeCard=function(){ if(!S.pw||!S.pw.repNew||!(S.pw.repH||[]).length) return ''; const r=S.pw.repH[0]; return card('📊 Rapport de fin '+v98De(mkLabel(r.mk)),'<p>Top 10, 5 moins vendus, les <b>signatures</b> proposées par le chef et les <b>5 favoris boissons</b>.</p>'+btn('Voir le rapport','rank',null,null,'primary')); };
+PANELS.rank={t:()=>'📊 Rapports du mois',f(){ const H=S.pw.repH||[], mk=monthKey(dayNum()), cur=monSales(mk), s=v98SigAll(), lost=S.pw.sigLost||{}, open=v98SigOpen();
+ let h='<div class="card cardok"><h3>⭐ Signatures '+v98De(MOIS[ymd(dayNum()).m])+'</h3>'+V98SIGC.map(c=>'<div class="row" style="display:flex;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line)"><small style="width:84px">'+V98ICON[c]+' '+CATS[c]+'</small><span style="flex:1;min-width:0">'+(s[c]?'<b>'+DISH[s[c]].e+' '+DISH[s[c]].n+'</b> <small>'+(cur[s[c]]||0)+' vendus ce mois</small>':'<small class="muted">aucune signature'+(lost[c]&&DISH[lost[c]]?' ('+DISH[lost[c]].n+' retiré de la carte)':'')+' jusqu’à la fin du mois</small>')+'</span>'+btn('Changer','v98sigpanel',null,null,'ghost sm',!open)+'</div>').join('')+
+  '<p class="muted">Une signature par catégorie, proposée par le chef à la fin du mois (meilleure vente ; à égalité : meilleure marge puis ordre alphabétique) et modifiable '+(open?'jusqu’au '+dateLong(S.pw.sigOpenUntil):'au prochain rapport')+'. Bonus modéré de commandes. Non protégée par la réunion de saison.</p></div>';
+ const df=favNow().boisson||[];
+ h+='<div class="card"><h3>🥂 5 favoris boissons'+(favProv()?' <small>(provisoires)</small>':'')+'</h3><div class="chips">'+(df.length?df.map((i,k)=>'<span class="chip">'+(k+1)+'. '+DISH[i].e+' '+DISH[i].n+'</span>').join(''):'<small class="muted">— pas encore de ventes —</small>')+'</div><small class="muted">Inchangé : les 5 boissons les plus vendues du mois.</small></div>';
+ const live=Object.keys(cur).filter(i=>sellable(i)&&cur[i]>0).sort((a,b)=>cur[b]-cur[a]).slice(0,10);
+ h+='<div class="card"><h3>🗓️ '+mkLabel(mk)+' en cours <small>(provisoire)</small></h3>'+(live.length?live.map((i,k)=>rankRow(i,cur[i],k+1,Object.values(s).filter(Boolean).concat(df))).join(''):'<p class="muted">Aucune vente enregistrée ce mois-ci.</p>')+'<small class="muted">⭐ = signature ou boisson favorite.</small></div>';
+ try{ h+=v98SalesCard(true); }catch(e){}
+ h+=H.map((r,ix)=>repCard(r,ix===0)).join('');
+ if(!H.length) h+='<div class="card"><p class="muted">Historique : le premier rapport apparaîtra le dernier jour du mois. Les ventes déjà réalisées ce mois-ci y sont comptées.</p></div>';
+ return h+'<div class="btnrow">'+btn('Fermer','pclose',null,null,'primary')+'</div>'; }};
+/* réunion de saison (m5b) : les signatures ne sont pas protégées */
+seasonPlan=function(){ const mi=monthIdx(), cur=S.pw.seasonal[mi]; if(cur&&cur.swaps) return cur; const mo=(calMonth()+1)%12, mo2=calMonth();
+ const mon=monSales(monthKey(dayNum())); const carte=carteDishes(); const sc=i=>mon[i]||0; const swaps=[];
+ for(const cat of ['entree','plat','dessert']){ const cands=carte.filter(i=>DISH[i].cat===cat).sort((a,b)=>sc(a)-sc(b)||DISH[a].n.localeCompare(DISH[b].n,'fr')); const out=cands[0];
+  const ins=libFood().filter(i=>DISH[i].cat===cat&&DISH[i].season&&(DISH[i].season.includes(mo)||DISH[i].season.includes(mo2))&&!S.menu[i].on&&!dishLocked(i));
+  if(out&&ins.length&&carteCnt()[cat]>=CARTE_MIN[cat]){ const inn=ins.sort((a,b)=>(DISH[b].season.includes(mo)?1:0)-(DISH[a].season.includes(mo)?1:0)||DISH[b].pop-DISH[a].pop)[0]; swaps.push({cat,out,in:inn,on:true,exc:false}); } }
+ const o={mi,mo,swaps,done:false,locked:[]}; if(seasonDue()) S.pw.seasonal[mi]=o; return o; };
+PANELS.season={t:()=>'🍂 Réunion de saison',f(){ const P=seasonPlan(), {ch}=chefs(); const mon=monSales(monthKey(dayNum())), s=v98SigAll(), sl=Object.values(s).filter(Boolean);
+ let h='<div class="card">'+dialogue({e:'👨‍🍳',n:ch?ch.name+' (chef)':'Le chef'},'« Fin de mois : voici la carte '+v98De(MOIS[(ymd(dayNum()).m+1)%12])+'. On remplace les moins vendus par des plats de saison. Les signatures ⭐ ne sont pas protégées : si j’en propose une, je vous le signale. »')+'</div>';
+ h+='<div class="card"><h3>⭐ Signatures actuelles <small>(non protégées)</small></h3><div class="chips">'+V98SIGC.map(c=>s[c]?'<span class="chip">'+DISH[s[c]].e+' '+CATS[c]+' : '+DISH[s[c]].n+'</span>':'<span class="chip warn">'+V98ICON[c]+' '+CATS[c]+' : aucune</span>').join('')+'</div><small class="muted">Les signatures '+v98De(MOIS[(ymd(dayNum()).m+1)%12])+' seront proposées au rapport de fin de mois. Une signature remplacée laisse sa catégorie sans signature jusque-là.</small></div>';
+ h+='<div class="card"><h3>🔁 Remplacements proposés</h3>'+(P.swaps.length?P.swaps.map((x,k)=>'<div class="row" style="padding:6px 0;border-top:1px solid var(--line)"><small>'+CATS[x.cat]+'</small><div style="display:flex;gap:6px;align-items:center;flex:1;min-width:0"><span style="flex:1;min-width:0">❌ '+DISH[x.out].e+' '+DISH[x.out].n+' <small>('+(mon[x.out]||0)+' vendus ce mois)</small>'+(sl.includes(x.out)?' <span class="chip v98sig">⭐ signature actuelle</span>':'')+'<br>➕ '+DISH[x.in].e+' <b>'+DISH[x.in].n+'</b> <small>🍂 '+ingList(x.in)+'</small></span>'+btn(x.on?'Oui':'Non','sswap',k,null,x.on?'primary sm':'ghost sm')+btn('↻','salt',k,null,'ghost sm')+'</div></div>').join(''):'<p class="muted">Aucun plat de saison disponible ou la carte est déjà à son minimum.</p>')+'</div>';
+ return h+'<div class="btnrow">'+btn('Valider la carte de saison ✔','sval',null,null,'primary')+'</div>'; }};
+ACT.sval=function(){ const P=seasonPlan(); let n=0, sg=0; const s=v98SigAll(), sl=Object.values(s);
+ for(const x of P.swaps){ if(!x.on) continue; if(!S.menu[x.out].on||carteCnt()[x.cat]<CARTE_MIN[x.cat]) continue; if(sl.includes(x.out)) sg++; S.menu[x.out].on=false; S.menu[x.in].on=true; S.menu[x.in].price=DISH[x.in].ref; n++; }
+ v98SigAll(); P.done=true; panelClose(); note('🍂 Carte de saison validée : '+n+' plat(s) remplacé(s)'+(sg?' dont '+sg+' signature(s) : catégorie sans signature jusqu’à la fin du mois':'')+'.','good'); };
+
+/* ===== v9.8 part d ===== */
+/* v9.8 d — affichage : logo « Fait maison », commande, ticket cuisine, ventes, stocks et bilan. */
+(function(){ const st=document.createElement('style'); st.textContent=
+'.chip.v98sig{background:#fbefc9;color:#7a4b00;font-weight:600;border:1px solid #e2b93b}'+
+'.v98fm{display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 5px;border:1.5px solid var(--acc,#7a1f2b);border-radius:999px;font-weight:800;font-size:10.5px;line-height:1.1;color:var(--acc,#7a1f2b);background:#fff8ef;vertical-align:middle;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}'+
+'.v98fm svg{width:17px;height:17px;flex:none}.v98fmb{display:flex;align-items:center;gap:10px}.v98fmb p{margin:0;flex:1;min-width:0}'+
+'.v98tk{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)}.v98tk .em{font-size:20px}.v98tk .grow{flex:1;min-width:0}.v98tk .chips{margin-top:3px}'+
+'.v98pg{height:5px;border-radius:3px;background:var(--line,#e8ddd0);overflow:hidden;margin-top:4px}.v98pg i{display:block;height:100%;background:var(--ok,#2e7d57)}';
+document.head.appendChild(st); })();
+const V98LOGO='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 15.5L16 5.5l12 10" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 13.6h11" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M8.5 17h15v5.6a3.4 3.4 0 0 1-3.4 3.4h-8.2a3.4 3.4 0 0 1-3.4-3.4z" fill="currentColor"/><path d="M23.5 19.2h5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
+const v98FM=()=>'<span class="v98fm" title="Fait maison : plats élaborés sur place à partir de produits bruts">'+V98LOGO+'Fait maison</span>';
+const v98FMBanner=t=>'<div class="v98fmb">'+v98FM()+'<p class="muted">'+(t||'Toute la carte est <b>cuisinée sur place</b> à partir de produits bruts. Les clients l’apprécient (petit bonus de satisfaction).')+'</p></div>';
+/* Carte : en-tête + signatures + ventes accompagnements/cuissons */
+{ const f=VIEWS.menu; VIEWS.menu=function(){ let h=f.apply(this,arguments); try{ h=h.replace('<h3>🍴 Carte du chef</h3>','<h3>🍴 Carte du chef '+v98FM()+'</h3>'); }catch(e){ console.error(e); } return h; }; }
+{ const f=viewPlats; viewPlats=function(){ let h=f.apply(this,arguments); try{ const k=h.indexOf('<h4 class="sec">'); const add=v98SigCard()+v98SalesCard(true); h=k<0?h+add:h.slice(0,k)+add+h.slice(k); }catch(e){ console.error(e); } return h; }; }
+{ const f=viewMDJ; viewMDJ=function(){ let h=f.apply(this,arguments); try{ h=card('',v98FMBanner('Menu du jour <b>fait maison</b>, comme toute la carte.'))+h; }catch(e){ console.error(e); } return h; }; }
+{ const f=PANELS.carte.f; PANELS.carte.f=function(){ return card('',v98FMBanner())+f.apply(this,arguments); }; }
+/* commande de la table */
+const v98AccLab=(a)=>(a||[]).map(s=>V98SIDES[s]?V98SIDES[s].e+' '+V98SIDES[s].n:'').join(' + ');
+function v98ItemTxt(it,full){ const p=[]; if(it.cu){ let c=v98CuLab(it.cu).toLowerCase(); if(it.cuOk===false) c+=' → servie '+v98CuLab(it.cuGot).toLowerCase(); p.push(c); } if(it.acc&&it.acc.length) p.push(full?v98AccLab(it.acc):it.acc.map(s=>V98SIDES[s].e).join('+')); if(it.sup) p.push('+'+money(it.sup).replace(' ','\u00a0')); return p.join(', '); }
+{ const f=dishNames; dishNames=function(g){ let t=f(g); try{ const L=(g.items||[]).filter(i=>!i.gift&&(i.cu||(i.acc&&i.acc.length))); if(L.length) t+=' <small>('+L.slice(0,4).map(i=>DISH[i.d].e+' '+v98ItemTxt(i,L.length<=2)).join(' · ')+(L.length>4?' …':'')+')</small>'; }catch(e){ console.error(e); } return t; }; }
+/* ticket cuisine */
+function v98TicketCard(){ const L=S.tickets.filter(tk=>!tk.bar&&G(tk.g)); if(!L.length&&!S.groups.some(g=>g.state==='cook')) return '';
+ const rows=L.slice(0,8).map(tk=>{ const g=G(tk.g), it=g.items[tk.i]; if(!it||!DISH[it.d]) return ''; const d=DISH[it.d]; const s=tk.w&&tk.w!=='P'?S.staff.find(x=>x.id===tk.w):null; const pct=tk.n0?clamp(Math.round((1-tk.need/tk.n0)*100),0,100):0;
+  return '<div class="v98tk"><span class="em">'+d.e+'</span><div class="grow"><b>'+(g.table!=null?'Table '+(g.table+1):'Comptoir')+' · '+d.n+'</b><div class="chips">'+(it.cu?'<span class="chip">'+V98CU[it.cu].e+' '+v98CuLab(it.cu)+'</span>':'')+(it.acc&&it.acc.length?it.acc.map(a=>'<span class="chip">'+V98SIDES[a].e+' '+V98SIDES[a].n+'</span>').join(''):'')+(it.sup?'<span class="chip ok">2ᵉ accompagnement +'+money2(it.sup)+'</span>':'')+(it.cuK&&it.cuK!=='rouge'?'<span class="chip warn">'+V98KIND[it.cuK]+' : à point ou bien cuite seulement</span>':'')+'</div><small>'+(s?'👨‍🍳 '+s.name:tk.w==='P'?'👤 vous':'⏳ en attente d’un cuisinier')+' · '+pct+' %</small><div class="v98pg"><i style="width:'+pct+'%"></i></div></div></div>'; }).join('');
+ return card('🧾 Tickets cuisine ('+L.length+')',(rows||'<p class="muted">Aucun plat en préparation.</p>')+(L.length>8?'<small class="muted">… et '+(L.length-8)+' autre(s).</small>':'')+'<p class="muted" style="margin:6px 0 0">Le serveur note la <b>cuisson</b> des viandes et l’<b>accompagnement</b> à la commande ; la volaille et le porc ne se servent qu’à point ou bien cuits.</p>'); }
+{ const f=VIEWS.home; VIEWS.home=function(){ let h=f.apply(this,arguments); try{ const tc=v98TicketCard(); if(tc){ const m=h.match(/<section class="card ?[^"]*"><h3>📊 Indicateurs<\/h3>/); h=m?h.replace(m[0],tc+m[0]):h+tc; } }catch(e){ console.error(e); } return h; }; }
+/* ventes du jour / du mois */
+function v98DayAgg(d){ d=d||S.day; return {acc:Object.assign({},d.v98acc||{}),sup:d.v98sup||0,sup2:d.v98sup2||0,cu:Object.assign({},d.v98cu||{}),ok:d.v98ok||0,miss:d.v98miss||0,accMiss:d.v98accMiss||0}; }
+function v98AggAdd(a,b){ for(const k in b.acc) a.acc[k]=(a.acc[k]||0)+b.acc[k]; for(const k in b.cu) a.cu[k]=(a.cu[k]||0)+b.cu[k]; for(const k of ['sup','sup2','ok','miss','accMiss']) a[k]=(a[k]||0)+(b[k]||0); return a; }
+const v98Empty=()=>({acc:{},sup:0,sup2:0,cu:{},ok:0,miss:0,accMiss:0});
+let v98MonAgg;
+function v98AccChips(a){ const n=V98SIDE_IDS.reduce((x,s)=>x+(a.acc[s]||0),0); return V98SIDE_IDS.map(s=>'<span class="chip">'+V98SIDES[s].e+' '+V98SIDES[s].n+' · <b>'+(a.acc[s]||0)+'</b>'+(n?' ('+Math.round((a.acc[s]||0)/n*100)+' %)':'')+'</span>').join(''); }
+function v98CuChips(a){ return V98CU_ORDER.map(c=>'<span class="chip">'+V98CU[c].e+' '+V98CU[c].n+' · <b>'+(a.cu[c]||0)+'</b></span>').join('')+'<span class="chip ok">✔ respectées '+a.ok+'</span><span class="chip '+(a.miss?'warn':'')+'">✖ ratées '+a.miss+'</span>'; }
+function v98RepLine(a){ const n=V98SIDE_IDS.reduce((x,s)=>x+(a.acc[s]||0),0); return n+' accompagnements ('+V98SIDE_IDS.filter(s=>a.acc[s]).map(s=>V98SIDES[s].n.toLowerCase()+' '+a.acc[s]).join(', ')+') · '+a.sup2+' 2ᵉ accompagnement(s) = '+money2(a.sup)+' · cuissons respectées '+a.ok+', ratées '+a.miss+'.'; }
+function v98SalesCard(month){ const a=month?v98MonAgg(monthKey(dayNum())):v98DayAgg();
+ return card('🍟 Accompagnements & cuissons '+(month?'· '+mkLabel(monthKey(dayNum())):'· aujourd’hui'),'<div class="chips">'+v98AccChips(a)+'</div><div class="chips"><span class="chip ok">2ᵉ accompagnement : '+a.sup2+' × '+money2(V98EXTRA)+' = <b>'+money2(a.sup)+'</b></span></div><div class="chips">'+v98CuChips(a)+'</div><small class="muted">Accompagnement compris dans le prix des plats de viande et de poisson (frites par défaut) ; un 2ᵉ accompagnement est facturé '+money2(V98EXTRA)+'.</small>'); }
+{ const f=endDay; endDay=function(){ try{ const mk=monthKey(dayNum()); S.pw.v98mon=S.pw.v98mon||{}; S.pw.v98mon[mk]=v98AggAdd(S.pw.v98mon[mk]||v98Empty(),v98DayAgg()); S.day.v98acc0=1; for(const k of Object.keys(S.pw.v98mon)) if(+k<mk-13) delete S.pw.v98mon[k]; }catch(e){ console.error(e); } return f.apply(this,arguments); }; }
+{ const f=v7MonthReport; v7MonthReport=function(){ const due=S.pw&&S.pw.repDue; const n0=(S.pw.repH||[]).length; const r=f.apply(this,arguments); try{ const H=S.pw.repH||[]; if(due&&H.length>n0&&H[0].mk===due.mk) H[0].v98=v98AggAdd(v98Empty(),(S.pw.v98mon||{})[due.mk]||v98Empty()); }catch(e){ console.error(e); } return r; }; }
+/* monthly aggregate must not double count the current day once closed */
+v98MonAgg=function(mk){ const m=(S.pw.v98mon||{})[mk]; const base=v98AggAdd(v98Empty(),m||v98Empty()); return (mk===monthKey(dayNum())&&!S.day.v98acc0)?v98AggAdd(base,v98DayAgg()):base; };
+/* stocks : accompagnements */
+function v98SideStockCard(){ const a=v98DayAgg(); const rows=V98SIDE_IDS.map(s=>{ const r=V98SIDES[s].rec; const port=Math.floor(Math.min(...Object.keys(r).map(i=>(S.stock[i]?S.stock[i].q:0)/r[i]))); const inc=Math.min(...Object.keys(r).map(i=>incoming(i)));
+  return '<div class="row" style="display:flex;gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line)"><span class="em">'+V98SIDES[s].e+'</span><div class="grow" style="flex:1;min-width:0"><b>'+V98SIDES[s].n+'</b><small>'+Object.keys(r).map(i=>ING[i].e+' '+ING[i].n.split(' (')[0]+' '+Math.floor(S.stock[i].q)).join(' · ')+'</small></div><span class="chip '+(port<10?'warn':'ok')+'">≈ '+port+' portions'+(inc>0?' (+'+inc+' en route)':'')+'</span><small style="width:70px;text-align:right">'+(a.acc[s]||0)+' servis</small></div>'; }).join('');
+ return card('🍟 Stocks des accompagnements',rows+'<p class="muted" style="margin:6px 0 0">Chaque accompagnement consomme ses propres ingrédients. Ils sont inclus dans la <b>commande automatique</b> du matin et le <b>réassort express</b> : jamais de rupture.</p>'); }
+{ const f=VIEWS.stock; VIEWS.stock=function(){ let h=f.apply(this,arguments); try{ if(v98SidesOnCarte()){ const k=h.indexOf('<section class="card ings">'); const c=v98SideStockCard(); h=k<0?h+c:h.slice(0,k)+c+h.slice(k); } }catch(e){ console.error(e); } return h; }; }
+{ const f=ingRow; ingRow=function(i,sid,used,cart){ let h=f.apply(this,arguments); try{ const sides=V98SIDE_IDS.filter(s=>V98SIDES[s].rec[i]); if(h&&sides.length&&v98SidesOnCarte()){ const t='Accompagnements : '+sides.map(s=>V98SIDES[s].e).join(' '); h=h.includes('Inutilisé à la carte')?h.replace('Inutilisé à la carte',t):h.replace(/(<small>Sert : [^<]*)/,'$1 · '+t); } }catch(e){ console.error(e); } return h; }; }
+/* bilan du jour */
+{ const f=showSummary; showSummary=function(s){ const sp=showPopup; const a=v98DayAgg(); showPopup=function(o){ try{ if(o&&/^Bilan/.test(o.title||'')){ const n=V98SIDE_IDS.reduce((x,k)=>x+(a.acc[k]||0),0); const add='<div class="srow"><span>🍟 dont suppléments 2ᵉ accompagnement ('+a.sup2+' × '+money2(V98EXTRA)+')</span><b>+'+money2(a.sup)+'</b></div>';
+   o.body=o.body.replace(/(<div class="srow pos"><span>Recettes<\/span><b>[^<]*<\/b><\/div>)/,'$1'+add); if(n||a.ok||a.miss) o.body=o.body.replace('<div class="two">','<div class="two"><small>🍟 Accompagnements servis : <b>'+n+'</b></small><small>🥩 Cuissons : <b>'+a.ok+'</b> respectées · <b>'+a.miss+'</b> ratées</small></div><div class="two">'); } }catch(e){ console.error(e); } return sp.apply(this,arguments); };
+ try{ return f.apply(this,arguments); } finally { showPopup=sp; } }; }
+window.V98={sides:V98SIDES,cu:V98CU,sig:()=>v98SigAll(),queue:()=>S.pw.v98q,pump:v98Pump,migrate:v98Migrate,ticketCard:v98TicketCard,sideStock:v98SideStockCard,sales:v98SalesCard,zone:v98Zone};
+/* v9.8 : intro v9.7 du chef se terminant par une virgule → minuscule au mot suivant (« Pour préparer le service ensemble, le mois… ») */
+{ const f=dialogue; dialogue=function(who,txt){ const h=f.apply(this,arguments); try{ return h.replace(/(« [^«»<]{3,60}, )(Le|La|Les|L’|Nous|Fin|Voici|Vos|Votre|Un|Une|Ce|Cette|Ces|On|Je|Il|Elle|Avec|Pour|Si)\b/,(m,a,w)=>a+w.toLowerCase()); }catch(e){ return h; } }; }
 
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
