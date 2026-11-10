@@ -1144,7 +1144,7 @@ function lambda(){
 function clusterA(i){ let a=i; while(a>0&&S.tabs[a-1].jr&&sameRow(a-1,a)) a--; return a; }
 function clusterB(i){ let b=i; while(b<S.tabs.length-1&&S.tabs[b].jr&&sameRow(b,b+1)) b++; return b; }
 function clusterOf(i){ const a=clusterA(i), b=clusterB(i); let cap=0,free=true,hold=null,occ=null;
-  for(let j=a;j<=b;j++){ cap+=S.tabs[j].cap; if(S.tabs[j].g!=null){ free=false; occ=S.tabs[j].g; } if(S.tabs[j].hold!=null) hold=S.tabs[j].hold; }
+  for(let j=a;j<=b;j++){ cap+=S.tabs[j].cap; if(S.tabs[j].g!=null){ free=false; occ=S.tabs[j].g; } if(S.tabs[j].off) free=false; if(S.tabs[j].hold!=null) hold=S.tabs[j].hold; }
   return {a,b,cap,free,hold,occ}; }
 function clusterList(){ const out=[]; for(let i=0;i<S.tabs.length;){ const c=clusterOf(i); out.push(c); i=c.b+1; } return out; }
 function maxPossibleCap(){ const n=S.tabs.length; const rows={}; for(let j=0;j<n;j++){ const r=slotOf(j).r; rows[r]=(rows[r]||0)+S.tabs[j].cap; } return Math.max(0,...Object.values(rows)); }
@@ -1159,9 +1159,9 @@ function fitCluster(g){
 // cherche une fenêtre de tables libres contiguës (même rangée) à assembler ; opts.contains = index qui doit en faire partie
 function findWindow(size,resId,contains){
   let best=null; const n=S.tabs.length;
-  for(let r=0;r<rowsFor(n);r++){ let lo=-1,hi=-1; for(let j=0;j<n;j++) if(slotOf(j).r===r){ if(lo<0) lo=j; hi=j; } if(lo<0) continue;
+  for(let r=0;r<rowsFor(n);r++){ let lo=-1,hi=-1; for(let j=0;j<n;j++) if(slotOf(j).r===r){ if(lo<0) lo=j; hi=j; } if(lo<0) continue; if(V99.wz&&v99Zone(lo)!==V99.wz) continue;
     for(let i=lo;i<=hi;i++){ let cap=0;
-      for(let j=i;j<=hi;j++){ const t=S.tabs[j]; if(t.g!=null||(t.hold!=null&&t.hold!==resId)) break; cap+=t.cap;
+      for(let j=i;j<=hi;j++){ const t=S.tabs[j]; if(t.g!=null||t.off||(t.hold!=null&&t.hold!==resId)) break; cap+=t.cap;
         if(j>i&&cap>=size&&(contains==null||(contains>=i&&contains<=j))){ const sc=cap*10+(j-i); if(!best||sc<best.sc) best={a:i,b:j,cap,sc}; break; } } } }
   return best;
 }
@@ -1454,14 +1454,14 @@ function assignAndProgress(dt){
   // barmen : en salle (prise de commande, service, addition) tant que le bar est calme — toute la journée
   const barRoom=(maxD)=>{ for(const s of bars){ if(busy.has(s.id)||openBar().length) continue; const e=R.ent[s.id]; let best=null,bs=1e9;
       for(const t of S.tasks){ if(t.w||t.forced||S.t<t.ready||t.type==='seat'||t.type==='clear') continue; const pos=taskPos(t); const dist=Math.hypot(e.x-pos.x,e.y-pos.y); if(dist>maxD) continue;
-        const sc=taskPri(t)*0.4+dist/40; if(sc<bs){ bs=sc; best=t; } }
+        const sc=taskPri(t)*0.4+dist/40+v99ZP(s,t); if(sc<bs){ bs=sc; best=t; } }
       if(best){ best.w=s.id; busy.add(s.id); } } };
   barRoom(95);
   // serveurs
   for(const s of waiters){ if(busy.has(s.id)) continue; const e=R.ent[s.id], aut=autOf(s); let best=null,bs=1e9;
     if(inDr){ const ob=openBar(); if(ob.length&&(!bars.length||S.t-ob[0].t0>1)){ ob[0].w=s.id; busy.add(s.id); continue; } }
     for(const t of S.tasks){ if(t.w||t.forced||S.t<t.ready) continue; const pos=taskPos(t); const dist=Math.hypot(e.x-pos.x,e.y-pos.y);
-      const sc=taskPri(t)*(0.25+0.15*aut)+dist/40*(1.3-0.2*aut); if(sc<bs){ bs=sc; best=t; } }
+      const sc=taskPri(t)*(0.25+0.15*aut)+dist/40*(1.3-0.2*aut)+v99ZP(s,t); if(sc<bs){ bs=sc; best=t; } }
     if(best){ best.w=s.id; busy.add(s.id); } }
   barRoom(999);
   // serveurs libres : aident le barman (tout de suite l'après-midi 15h-18h), sinon quand une boisson attend
@@ -1753,8 +1753,7 @@ function resTick(){
   for(const r of S.res.slice().sort((a,b)=>(b.size-a.size)||(a.t-b.t))){
     if(r.state!=='booked') continue;
     if(S.t>=Math.min(r.t-20,svcStart(r))&&!r.hold){
-      let c=null; for(const x of clusterList()){ if(!x.free||x.hold!=null||x.cap<r.size) continue; if(!c||x.cap<c.cap) c=x; }
-      if(!c&&(r.size>=3||autoAssembleOK({size:r.size}))){ const w=findWindow(r.size,r.id,null); if(w){ r.autoJ=joinWindow(w); c=clusterOf(w.a); } }
+      let c=v99ResHold(r);
       if(c){ for(let j=c.a;j<=c.b;j++) S.tabs[j].hold=r.id; r.hold=[c.a,c.b]; }
     }
     if(S.t>=r.t+r.lateBy){
@@ -1826,7 +1825,7 @@ function A_seat(gid,ti){
   if(!mine&&c.cap<g.size){ const w=findWindow(g.size,g.res,ti); if(!w) return {ok:false,msg:'Table trop petite pour '+g.size+' personnes : assemblez des tables voisines.'}; if(g.rsv) releaseTable(g); g.autoJ=joinWindow(w); c=clusterOf(w.a); }
   if(g.rsv&&!mine) releaseTable(g);
   if(mine&&!c.free&&c.occ!==g.id) return {ok:false,msg:'Table occupée.'};
-  seatGroup(g,c); return {ok:true,msg:'Groupe installé table '+(c.a+1)+(c.b>c.a?'-'+(c.b+1):'')+'.'};
+  seatGroup(g,c); return {ok:true,msg:'Groupe installé table '+v99TabN(c.a)+(c.b>c.a?'-'+v99TabN(c.b):'')+'.'};
 }
 function A_join(i){
   const n=S.tabs.length; if(i<0||i+1>=n||!sameRow(i,i+1)) return {ok:false,msg:'Pas de table voisine à assembler.'};
@@ -2476,25 +2475,25 @@ function grpDesc(g){
 }
 function stripHTML_v5(){
   const pr=S.prompts.find(x=>x.ui);
-  if(pr&&pr.kind==='reg'){ const g=G(pr.g); if(g){ const r=REG(g.reg)||{}; const ti=g.table!=null?'Table '+(g.table+1):'Groupe';
+  if(pr&&pr.kind==='reg'){ const g=G(pr.g); if(g){ const r=REG(g.reg)||{}; const ti=g.table!=null?'Table '+v99TabN(g.table):'Groupe';
     const chips=pr.opts.map(id=>'<button class="gb dsh'+(pr.selD===id?' on':'')+'" data-a="regdish" data-p="'+pr.id+'" data-q="'+id+'"><span>'+DISH[id].e+' '+DISH[id].n.split(' ')[0]+'</span><small>'+(id===r.fav?'⭐ favori':fp(S.menu[id].price))+'</small></button>').join('')+'<button class="gb dsh'+(pr.selD==='none'?' on':'')+'" data-a="regdish" data-p="'+pr.id+'" data-q="none"><span>🍽️ Carte</span><small>sans spécial</small></button>';
     const gk=(k,lab)=>{ const dis=!gestAvail(g,k,0); const gd=(k==='rien'||k==='remise')?null:gestDish(k,g,0); return '<button class="gb g5" data-a="prompt" data-p="'+pr.id+'" data-q="'+k+'"'+(dis?' disabled':'')+'><span>'+lab+'</span><small>'+(k==='rien'?'0 €':gd?'≈ '+fp(dishCost(gd)):'')+'</small></button>'; };
     return '<i data-reg="1" hidden></i><div class="st-t prm"><b>'+ti+'</b> · ⭐ <b>'+(g.name||'Habitué')+'</b> · fidélité '+Math.round(r.loy||0)+' % · groupe de '+g.size+'. <b>Plat spécial</b> puis <b>geste commercial</b> (défaut dans quelques secondes) :</div><div class="gbs">'+chips+'</div><div class="gbs">'+gk('apero','🥂 Apéro')+gk('cafe','☕ Café')+gk('the','🫖 Thé')+gk('choco','🥛 Choco')+gk('rien','🙂 Rien')+'</div><i class="cd cdbar"></i>'; } }
-  else if(pr){ const g=G(pr.g); if(g){ const al=pr.alt; const ct=CT[g.type]||CT.std; const ti=g.table!=null?'Table '+(g.table+1):'Groupe';
+  else if(pr){ const g=G(pr.g); if(g){ const al=pr.alt; const ct=CT[g.type]||CT.std; const ti=g.table!=null?'Table '+v99TabN(g.table):'Groupe';
     const gb=(k,lab)=>{ const dis=!gestAvail(g,k,pr.k); const pc=Math.round(acceptProb(g,pr.orig,al,k)*100); return '<button class="gb" data-a="prompt" data-p="'+pr.id+'" data-q="'+k+'"'+(dis?' disabled':'')+'><span>'+lab+'</span><small>'+pc+' %</small></button>'; };
     return '<div class="st-t prm"><b>'+ti+'</b> · '+(ct.e||'')+' '+ct.n+' voulait '+DISH[pr.orig].e+' <b>'+DISH[pr.orig].n+'</b> (rupture) → on propose '+(al?DISH[al].e+' <b>'+DISH[al].n+'</b>':'<b>rien</b>')+'. Un geste ?</div><div class="gbs">'+gb('rien','🙂 Rien')+gb('cafe','☕ Café')+gb('dessert','🍮 Dessert')+gb('remise','🏷️ −10 %')+'</div><i class="cd cdbar"></i>'; } }
   const sel=R.sel;
-  if(sel&&sel.t==='tb'){ const c=clusterOf(sel.i); const g=c.occ!=null?G(c.occ):null; const nm=c.b>c.a?'Tables '+(c.a+1)+'–'+(c.b+1):'Table '+(c.a+1);
+  if(sel&&sel.t==='tb'){ const c=clusterOf(sel.i); const g=c.occ!=null?G(c.occ):null; const nm=c.b>c.a?'Tables '+v99TabN(c.a)+'–'+v99TabN(c.b):'Table '+v99TabN(c.a);
     let t='<b>'+nm+'</b> · '+c.cap+' couverts · ', b='';
     if(g){ const f=patFrac(g); t+=grpDesc(g)+' · <b>'+STL[g.state]+'</b>'+(f!=null?' · patience '+Math.round(f*100)+' %':'')+(g.items.length?' · '+dishNames(g):'');
       const tk=S.tasks.find(x=>x.g===g.id&&x.type!=='seat'&&!x.forced); if(tk&&tk.type!=='clear'||(tk&&tk.type==='clear')) b+='<button class="gb" data-a="take" data-p="'+tk.id+'"><span>✋ Prendre la main</span><small>'+({order:'commande',serve:'service',bill:'addition',clear:'débarras'}[tk.type]||'')+'</small></button>';
       if(g.state==='bill') b+='<button class="gb gold" data-a="cash" data-p="'+g.id+'"><span>💶 Encaisser</span><small>+ pourboire</small></button>'; }
-    else { const r=c.hold!=null?S.res.find(x=>x.id===c.hold):null; t+=r?'📅 tenue pour <b>'+r.name+'</b> ('+r.size+' pers., '+hhmm(r.t%1440)+')':'<b>libre</b>';
+    else { const r=c.hold!=null?S.res.find(x=>x.id===c.hold):null; t+=r?'📅 tenue pour <b>'+r.name+'</b> ('+r.size+' pers., '+hhmm(r.t%1440)+')':(S.tabs[c.a]&&S.tabs[c.a].off?'<b>fermée (météo)</b>':'<b>libre</b>');
       const i=sel.i; if(c.free){ if(S.tabs[c.a].jr||c.b>c.a){ b+='<button class="gb" data-a="split" data-p="'+c.a+'"><span>✂️ Séparer</span><small>en '+(c.b-c.a+1)+' tables</small></button>'; }
-        if(c.hold==null){ const nx=c.b+1, pv=c.a-1; if(nx<S.tables&&sameRow(c.b,nx)&&clusterOf(nx).free&&clusterOf(nx).hold==null) b+='<button class="gb" data-a="join" data-p="'+c.b+'"><span>🔗 + table '+(nx+1)+'</span><small>'+(c.cap+S.tabs[nx].cap)+' couverts</small></button>';
-          if(pv>=0&&sameRow(pv,c.a)&&clusterOf(pv).free&&clusterOf(pv).hold==null) b+='<button class="gb" data-a="join" data-p="'+pv+'"><span>🔗 + table '+(pv+1)+'</span><small>'+(c.cap+S.tabs[pv].cap)+' couverts</small></button>'; } } else t+=' · occupée'; }
+        if(c.hold==null){ const nx=c.b+1, pv=c.a-1; if(nx<S.tables&&sameRow(c.b,nx)&&clusterOf(nx).free&&clusterOf(nx).hold==null) b+='<button class="gb" data-a="join" data-p="'+c.b+'"><span>🔗 + table '+v99TabN(nx)+'</span><small>'+(c.cap+S.tabs[nx].cap)+' couverts</small></button>';
+          if(pv>=0&&sameRow(pv,c.a)&&clusterOf(pv).free&&clusterOf(pv).hold==null) b+='<button class="gb" data-a="join" data-p="'+pv+'"><span>🔗 + table '+v99TabN(pv)+'</span><small>'+(c.cap+S.tabs[pv].cap)+' couverts</small></button>'; } } else t+=' · occupée'; }
     return '<div class="st-t">'+t+'</div><div class="gbs">'+b+'</div>'; }
-  if(sel&&sel.t==='g'){ const g=G(sel.id); if(g){ let t='<b>'+(g.table!=null?'Table '+(g.table+1):'File d’attente')+'</b> · '+grpDesc(g)+' · '+STL[g.state]; const f=patFrac(g); if(f!=null) t+=' · patience '+Math.round(f*100)+' %'; if(g.items.length) t+=' · '+dishNames(g);
+  if(sel&&sel.t==='g'){ const g=G(sel.id); if(g){ let t='<b>'+(g.table!=null?'Table '+v99TabN(g.table):'File d’attente')+'</b> · '+grpDesc(g)+' · '+STL[g.state]; const f=patFrac(g); if(f!=null) t+=' · patience '+Math.round(f*100)+' %'; if(g.items.length) t+=' · '+dishNames(g);
     if(g.rsv&&g.state==='queue') t+=' · 📅 table attribuée'; let b='';
     if(g.state==='queue'){ t+=' <br><i>Glissez le groupe sur une table, ou touchez une table.</i>'; if(g.table==null) b+='<button class="gb" data-a="refuse" data-p="'+g.id+'"><span>🚫 Refuser</span><small>poliment</small></button>'; }
     if(g.state==='bill') b+='<button class="gb gold" data-a="cash" data-p="'+g.id+'"><span>💶 Encaisser</span><small>+ pourboire</small></button>';
@@ -2836,7 +2835,7 @@ function viewRes(){
   h+='<h4 class="sec">Carnet de réservations</h4>';
   const list=S.res.slice().sort((a,b)=>a.t-b.t); if(!list.length) h+=card('','<p class="muted">Carnet vide.</p>');
   for(const r of list){ const st=RSL[r.state]||['',''];
-    h+=card('','<div class="row"><span class="em">'+(r.state==='noshow'?'👻':'📅')+'</span><div class="grow"><b>'+r.name+' · '+r.size+' pers.</b><small>'+dowName(Math.floor(r.t/1440)+1)+' '+hhmm(r.t%1440)+(r.lateBy&&r.state==='booked'?' · ⏰ annonce un retard':'')+(r.diet?' · '+DIETS[r.diet].e:'')+(r.hold?' · table '+(r.hold[0]+1)+(r.hold[1]>r.hold[0]?'–'+(r.hold[1]+1):'')+' tenue':'')+'</small></div><span class="chip '+st[1]+'">'+st[0]+'</span></div>','rsv');
+    h+=card('','<div class="row"><span class="em">'+(r.state==='noshow'?'👻':'📅')+'</span><div class="grow"><b>'+r.name+' · '+r.size+' pers.</b><small>'+dowName(Math.floor(r.t/1440)+1)+' '+hhmm(r.t%1440)+(r.lateBy&&r.state==='booked'?' · ⏰ annonce un retard':'')+(r.diet?' · '+DIETS[r.diet].e:'')+(r.hold?' · table '+v99TabN(r.hold[0])+(r.hold[1]>r.hold[0]?'–'+v99TabN(r.hold[1]):'')+' tenue':'')+'</small></div><span class="chip '+st[1]+'">'+st[0]+'</span></div>','rsv');
   }
   h+='<h4 class="sec">⭐ Habitués</h4>';
   if(!S.regulars.length) h+=card('','<p class="muted">Aucun habitué pour l’instant : un client très satisfait peut le devenir.</p>');
@@ -3196,28 +3195,28 @@ const PITEM={
  a:{n:'Étagère à bouteilles',e:'🍷',cat:'de',cost:120,amb:.7},
  j:{n:'Juke-box',e:'🎵',cat:'de',cost:200,amb:1}};
 const PCATS=[['st','Structure'],['sa','Salle'],['ck','Cuisine'],['an','Annexes'],['de','Déco']];
-const WALKCH='.DE';
+const WALKCH='.DE;,';
 function blankPlan(pid){ const P=PREMISES[pid], g=[]; for(let y=0;y<P.h;y++){ let r=''; for(let x=0;x<P.w;x++) r+=(x===0||y===0||x===P.w-1||y===P.h-1)?'W':'.'; g.push(r); } return {pid,W:P.w,H:P.h,g,it:[],ver:1}; }
 const pget=(pl,x,y)=>(x<0||y<0||x>=pl.W||y>=pl.H)?null:pl.g[y][x];
 function pset(pl,x,y,ch){ const r=pl.g[y]; pl.g[y]=r.slice(0,x)+ch+r.slice(x+1); }
-const tdim=t=>{ const L=t.t==='4'?3:2; return t.o?{w:1,h:L}:{w:L,h:1}; };
+const tdim=t=>{ const L=(t.t==='4'||t.t==='k4')?3:2; return t.o?{w:1,h:L}:{w:L,h:1}; };
 function tableAtCell(pl,x,y){ for(const t of pl.it){ const d=tdim(t); if(x>=t.x&&x<t.x+d.w&&y>=t.y&&y<t.y+d.h) return t; } return null; }
 const cellC=(x,y)=>({x:PAD+(x+.5)*CELL,y:PAD+(y+.5)*CELL});
 const PLANCACHE=new WeakMap();
 function compilePlan(pl){
   const hit=PLANCACHE.get(pl); if(hit&&hit.ver===pl.ver) return hit.C;
   const W=pl.W,H=pl.H,N=W*H, C={W,H,N,cnt:{},tabs:[],E:null};
-  const its=pl.it.slice().sort((a,b)=>a.y-b.y||a.x-b.x);
+  const its=pl.it.slice().sort((a,b)=>v99Ord(pl,a)-v99Ord(pl,b)||a.y-b.y||a.x-b.x);
   const occ=new Uint8Array(N); // tables
-  its.forEach((t,i)=>{ const d=tdim(t), cap=t.t==='4'?4:2; for(let yy=t.y;yy<t.y+d.h;yy++) for(let xx=t.x;xx<t.x+d.w;xx++) if(xx>=0&&yy>=0&&xx<W&&yy<H) occ[yy*W+xx]=1;
-    C.tabs.push({i,x:t.x,y:t.y,cw:d.w,ch:d.h,o:t.o?1:0,cap,cx:PAD+(t.x+d.w/2)*CELL,cy:PAD+(t.y+d.h/2)*CELL,w:d.w*CELL-2,h:d.h*CELL-2}); });
+  its.forEach((t,i)=>{ const d=tdim(t), cap=(t.t==='4'||t.t==='k4')?4:2; for(let yy=t.y;yy<t.y+d.h;yy++) for(let xx=t.x;xx<t.x+d.w;xx++) if(xx>=0&&yy>=0&&xx<W&&yy<H) occ[yy*W+xx]=1;
+    C.tabs.push({i,x:t.x,y:t.y,cw:d.w,ch:d.h,o:t.o?1:0,cap,cx:PAD+(t.x+d.w/2)*CELL,cy:PAD+(t.y+d.h/2)*CELL,w:d.w*CELL-2,h:d.h*CELL-2,tt:t.t,z:v99Ord(pl,t)?'ter':'sal'}); });
   const cnt=C.cnt; for(const k in PITEM) cnt[k]=0;
   const walk=new Uint8Array(N);
   for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const ch=pl.g[y][x]; cnt[ch]=(cnt[ch]||0)+1; walk[y*W+x]=(WALKCH.indexOf(ch)>=0&&!occ[y*W+x])?1:0; if(ch==='E'&&!C.E){ C.E={x,y}; } }
   cnt['2']=C.tabs.filter(t=>t.cap===2).length; cnt['4']=C.tabs.filter(t=>t.cap===4).length;
   C.occ=occ; C.walk=walk; C.seats=C.tabs.reduce((a,t)=>a+t.cap,0);
   // adjacence + rangées (chaînes)
-  const adj=(a,b)=>{ const ya0=a.y,ya1=a.y+a.ch,yb0=b.y,yb1=b.y+b.ch; if(Math.min(ya1,yb1)-Math.max(ya0,yb0)<=0) return false; const gap=b.x-(a.x+a.cw); return gap>=0&&gap<=1; };
+  const adj=(a,b)=>{ if(a.z!==b.z) return false; const ya0=a.y,ya1=a.y+a.ch,yb0=b.y,yb1=b.y+b.ch; if(Math.min(ya1,yb1)-Math.max(ya0,yb0)<=0) return false; const gap=b.x-(a.x+a.cw); return gap>=0&&gap<=1; };
   C.adj=[]; C.chain=[]; let ch=-1; for(let i=0;i<C.tabs.length;i++){ const ok=i>0&&adj(C.tabs[i-1],C.tabs[i]); C.adj[i]=ok; if(!ok) ch++; C.chain[i]=ch; } C.chains=ch+1;
   // entrée
   if(C.E){ const e=C.E; let ox=0,oy=0; if(e.x===0)ox=-1; else if(e.x===W-1)ox=1; else if(e.y===0)oy=-1; else if(e.y===H-1)oy=1; C.E.ox=ox;C.E.oy=oy; C.E.ix=e.x-ox; C.E.iy=e.y-oy; }
@@ -3319,7 +3318,7 @@ function layout(){
   if(R.lay&&R.layKey===key) return R.lay; R.layKey=key; const C=compilePlan(pl);
   const resized=setWorld(C);
   const walk=C.walk.slice(); for(let i=0;i<C.tabs.length-1;i++){ if(S.tabs[i]&&S.tabs[i].jr&&C.adj[i+1]){ const a=C.tabs[i],b=C.tabs[i+1]; for(let yy=Math.max(a.y,b.y);yy<Math.min(a.y+a.ch,b.y+b.ch);yy++) for(let xx=a.x+a.cw;xx<b.x;xx++) walk[yy*C.W+xx]=0; } }
-  const L={rows:C.chains,tb:C.tabs.map((t,i)=>({i,r:C.chain[i],c:i,cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o})),C,walk,plants:[],lanes:null};
+  const L={rows:C.chains,tb:C.tabs.map((t,i)=>({i,r:C.chain[i],c:i,cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o,tt:t.tt,z:t.z})),C,walk,plants:[],lanes:null};
   R.lay=L; R.lanesKey=''; R.pathCache={}; R.laneSlots=null;
   if(resized&&typeof sceneResize==='function'&&SC&&SC.cv) sceneResize();
   return L;
@@ -3402,7 +3401,7 @@ function qLayout(){
   return out;
 }
 /* ---------- géométrie des tables (statique : le plan est fixe) ---------- */
-function tgtGeom(i){ const L=layout(), T=L.tb[i]; if(!T) return null; return {cx:T.cx,cy:T.cy,w:T.w,h:T.h,cap:T.cap,r:T.r,o:T.o}; }
+function tgtGeom(i){ const L=layout(), T=L.tb[i]; if(!T) return null; return {cx:T.cx,cy:T.cy,w:T.w,h:T.h,cap:T.cap,r:T.r,o:T.o,tt:T.tt,z:T.z}; }
 function visGeom(i){ return tgtGeom(i); }
 function tvStep(dt){} function tvSnap(){}
 function clusterSpot(a,b){ const A=tgtGeom(a), B=tgtGeom(b); if(!A||!B) return {x:100,y:100}; const mx=(A.cx+B.cx)/2, my=(A.cy+B.cy)/2; return Object.assign(standAt(mx,my+ (A.o?0:A.h/2+9)),{ln:null}); }
@@ -3479,8 +3478,8 @@ function drawItem(c,ch,x,y,env){
   case 'W': { const dn=g(0,1)==='W', up=g(0,-1)==='W'; c.fillStyle='#5a2d24'; c.fillRect(X,Y,CELL,CELL);
       const BR=['#7a3f31','#74392d','#82463a','#6c352a']; for(let r=0;r<4;r++){ const o=(r%2)*4; for(let k=-1;k<2;k++){ const bx=X+o+k*8; const h=hsh(x*8+k+r*3,y*5+r); const ax=Math.max(X,bx+.3), bw=Math.min(X+CELL,bx+7.6)-ax; if(bw<=0) continue; c.fillStyle=BR[h&3]; c.fillRect(ax,Y+r*4+.3,bw,3.4); if(h%7===0){ c.fillStyle='rgba(255,200,150,.12)'; c.fillRect(ax,Y+r*4+.3,bw,1); } } }
       if(!dn){ c.fillStyle='#34170e'; c.fillRect(X,Y+CELL-3,CELL,3); c.fillStyle='#4a2418'; c.fillRect(X,Y+CELL-3,CELL,1); } if(!up&&y>0){ c.fillStyle='rgba(255,226,190,.2)'; c.fillRect(X,Y,CELL,1.2); }
-      const border=(x===0||y===0||x===C.W-1||y===C.H-1);
-      if(border&&!((x===0||x===C.W-1)&&(y===0||y===C.H-1))&&((x+y)%3===1)&&!env.noWin){ const vert=(x===0||x===C.W-1); const wx=X+(vert?3:2), wy=Y+(vert?2:3), ww=vert?10:12, wh=vert?12:10;
+      const _e=v99Edge(pl,x,y,C), border=_e.b;
+      if(border&&!_e.corner&&((x+y)%3===1)&&!env.noWin){ const vert=_e.v; const wx=X+(vert?3:2), wy=Y+(vert?2:3), ww=vert?10:12, wh=vert?12:10;
         c.fillStyle='#f2e3c6'; c.fillRect(wx-.5,wy-.5,ww+1,wh+1); const gg=c.createLinearGradient(wx,wy,wx+ww,wy+wh); gg.addColorStop(0,'#cfe9f4'); gg.addColorStop(1,'#8fc0d8'); c.fillStyle=gg; c.fillRect(wx+1,wy+1,ww-2,wh-2); c.fillStyle='rgba(255,255,255,.55)'; c.beginPath(); c.moveTo(wx+1,wy+1); c.lineTo(wx+ww*.55,wy+1); c.lineTo(wx+1,wy+wh*.6); c.fill(); c.fillStyle='#f2e3c6'; if(vert) c.fillRect(wx,wy+wh/2-.5,ww,1); else c.fillRect(wx+ww/2-.5,wy,1,wh); }
       break; }
   case 'D': { c.fillStyle='rgba(95,60,30,.55)'; c.fillRect(X,Y,CELL,CELL); const wallH=(g(-1,0)==='W'&&g(1,0)==='W'); const gg=c.createLinearGradient(X,Y,X+CELL,Y+CELL); gg.addColorStop(0,'#a8703c'); gg.addColorStop(1,'#7a4a24'); c.fillStyle=gg;
@@ -3580,23 +3579,24 @@ function drawTablesStatic(c,VB,jr){
 }
 /* dynamique (par image) : flammes de bougies uniquement */
 function drawTables(c,VB){ const tm=SC.tt||0; for(const t of VB){ const fl=.65+.35*Math.sin(tm*7+t.cx*.3)+.08*Math.sin(tm*13+t.cy); c.fillStyle='rgba(255,196,90,'+(0.2*fl)+')'; c.beginPath(); c.arc(t.cx,t.cy-.4,3.8,0,6.3); c.fill(); c.fillStyle='rgba(255,226,140,'+(0.65+0.35*fl)+')'; c.beginPath(); c.ellipse(t.cx,t.cy-.6,.55,.95+.15*fl,0,0,6.3); c.fill(); } }
-function paintTablesStatic(c,C,pl,o){ drawTablesStatic(c,C.tabs.map(t=>({cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o}))); }
+function paintTablesStatic(c,C,pl,o){ drawTablesStatic(c,C.tabs.map(t=>({cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o,tt:t.tt,z:t.z}))); }
 /* --- sol + murs + équipement (scène et éditeur) --- */
 function paintPlan(c,C,pl,o){
   o=o||{}; const L=o.L||null; const W=C.W,H=C.H; const env={C,pl,noWin:false};
   c.fillStyle='#2a1f20'; c.fillRect(0,0,W*CELL+2*PAD,H*CELL+2*PAD);
   c.fillStyle='#46393a'; c.fillRect(0,0,W*CELL+2*PAD,H*CELL+2*PAD); // trottoir
   const wcSet=new Set(); for(const t of C.L.T) for(let dy=-1;dy<=1;dy++) for(let dx=-1;dx<=1;dx++) wcSet.add((t.y+dy)*W+(t.x+dx));
-  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const ch=pl.g[y][x]; if(ch==='W') continue; const X=PAD+x*CELL, Y=PAD+y*CELL, i=y*W+x;
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const ch=pl.g[y][x]; if(ch==='W') continue; const X=PAD+x*CELL, Y=PAD+y*CELL, i=y*W+x; if(v99Floor(c,pl,x,y,ch,X,Y)) continue;
     const kit=C.kit&&C.comp[i]>=0&&C.kit.has(C.comp[i]) || (C.kit&&'FPRLQ'.indexOf(ch)>=0);
     if(kit) floorTile(c,X,Y,'#f1f0eb','#e4e6e2','rgba(120,130,135,.3)');
     else if(wcSet.has(i)||ch==='T') floorTile(c,X,Y,'#e7f1ec','#d3e5dc','rgba(110,150,130,.32)');
     else if(ch==='S'||ch==='V'){ c.fillStyle='#c4b8a6'; c.fillRect(X,Y,CELL,CELL); c.fillStyle='rgba(90,70,50,.2)'; c.fillRect(X,Y,CELL,.7); c.fillRect(X,Y,.7,CELL); c.fillRect(X+((hsh(x,y)>>2)%9)+3,Y+((hsh(x,y)>>5)%9)+3,3,.5); }
     else floorWood(c,x,y,X,Y); }
+  v99FloorW(c,pl,C);
   // ombres portées des murs
   c.save(); for(let y=0;y<H;y++) for(let x=0;x<W;x++){ if(pl.g[y][x]==='W') continue; const X=PAD+x*CELL, Y=PAD+y*CELL; if(pget(pl,x,y-1)==='W'){ const gr=c.createLinearGradient(0,Y,0,Y+7); gr.addColorStop(0,'rgba(30,12,5,.36)'); gr.addColorStop(1,'rgba(30,12,5,0)'); c.fillStyle=gr; c.fillRect(X,Y,CELL,7); } if(pget(pl,x-1,y)==='W'){ const gr=c.createLinearGradient(X,0,X+6,0); gr.addColorStop(0,'rgba(30,12,5,.28)'); gr.addColorStop(1,'rgba(30,12,5,0)'); c.fillStyle=gr; c.fillRect(X,Y,6,CELL); } } c.restore();
   if(o.lanes){ const sl=laneSlots(); const cols=['rgba(150,50,60,.5)','rgba(190,140,50,.46)','rgba(50,120,135,.46)']; for(let i=0;i<3;i++) for(const v of sl[i].slice(0,7)){ const X=PAD+(v%W)*CELL, Y=PAD+((v/W)|0)*CELL; c.fillStyle=cols[i]; rr(c,X+1.5,Y+1.5,CELL-3,CELL-3,3); c.fill(); c.strokeStyle='rgba(255,240,215,.6)'; c.lineWidth=.6; c.setLineDash([2,2]); rr(c,X+2.5,Y+2.5,CELL-5,CELL-5,2); c.stroke(); c.setLineDash([]); } }
-  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const ch=pl.g[y][x]; if(ch==='.') continue; drawItem(c,ch,x,y,env); }
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const ch=pl.g[y][x]; if(ch==='.'||ch===';'||ch===',') continue; if(v99Skip(pl,x,y,ch)) continue; drawItem(c,ch,x,y,env); }
   for(const v of (C.barFront||[])){ const X=PAD+(v%W)*CELL+CELL/2, Y=PAD+((v/W)|0)*CELL+CELL/2; if(!C.occ[v]) stoolAt(c,X,Y-1); }
   if(C.L.B.length){ const b=C.L.B[Math.floor(C.L.B.length/2)]; txt(c,'BAR',PAD+(b.x+.5)*CELL,PAD+(b.y+.5)*CELL,4.6,'rgba(70,40,25,.8)','800'); }
 }
@@ -3609,20 +3609,20 @@ function paintLight(c,C,pl,VB,o){
   for(const v of VB) punch(v.cx,v.cy,v.w>40?58:44,.95);
   for(const l of C.L.l||[]) punch(PAD+(l.x+.5)*CELL,PAD+(l.y+.5)*CELL,40,.9);
   for(const b of C.L.B) punch(PAD+(b.x+.5)*CELL,PAD+(b.y+.5)*CELL,26,.8);
-  t.globalAlpha=.9; t.fillStyle='#000'; if(C.kit){ for(let y=0;y<C.H;y++) for(let x=0;x<C.W;x++){ const i=y*C.W+x, ch=pl.g[y][x]; if(ch==='W') continue; if((C.comp[i]>=0&&C.kit.has(C.comp[i]))||'FPRLQ'.indexOf(ch)>=0) t.fillRect(PAD+x*CELL-1,PAD+y*CELL-1,CELL+2,CELL+2); } } t.globalAlpha=1;
+  v99Punch(t,C,pl); t.globalAlpha=.9; t.fillStyle='#000'; if(C.kit){ for(let y=0;y<C.H;y++) for(let x=0;x<C.W;x++){ const i=y*C.W+x, ch=pl.g[y][x]; if(ch==='W') continue; if((C.comp[i]>=0&&C.kit.has(C.comp[i]))||'FPRLQ'.indexOf(ch)>=0) t.fillRect(PAD+x*CELL-1,PAD+y*CELL-1,CELL+2,CELL+2); } } t.globalAlpha=1;
   c.save(); c.drawImage(tm,0,0,WWp,WHp);
   // reflets chauds sur le sol (additif léger)
   c.globalCompositeOperation='lighter'; c.globalAlpha=.16; for(const v of VB) c.drawImage(CHIC.pool,v.cx-48,v.cy-48,96,96); for(const l of C.L.l||[]){ c.globalAlpha=.2; c.drawImage(CHIC.pool,PAD+(l.x+.5)*CELL-34,PAD+(l.y+.5)*CELL-34,68,68); }
   c.globalAlpha=1; c.globalCompositeOperation='source-over';
   // rayons de fenêtre
-  for(let y=0;y<C.H;y++) for(let x=0;x<C.W;x++){ if(pl.g[y][x]!=='W') continue; const border=(x===0||y===0||x===C.W-1||y===C.H-1); if(!border||((x===0||x===C.W-1)&&(y===0||y===C.H-1))||((x+y)%3!==1)) continue; const X=PAD+x*CELL, Y=PAD+y*CELL; let ax,ay,bx,by;
-    if(x===0){ ax=X+CELL; ay=Y+3; bx=ax+30; by=ay+16; } else if(x===C.W-1){ ax=X; ay=Y+3; bx=ax-30; by=ay+16; } else if(y===0){ ax=X+2; ay=Y+CELL; bx=ax+14; by=ay+30; } else { ax=X+2; ay=Y; bx=ax+14; by=ay-30; }
-    const sx=(x===0||x===C.W-1)?0:12, sy=(x===0||x===C.W-1)?10:0; const gg=c.createLinearGradient(ax,ay,bx,by); gg.addColorStop(0,'rgba(255,244,214,.2)'); gg.addColorStop(1,'rgba(255,244,214,0)'); c.fillStyle=gg; c.beginPath(); c.moveTo(ax,ay); c.lineTo(ax+sx,ay+sy); c.lineTo(bx+sx,by+sy); c.lineTo(bx,by); c.closePath(); c.fill(); }
+  for(let y=0;y<C.H;y++) for(let x=0;x<C.W;x++){ if(pl.g[y][x]!=='W') continue; const _e=v99Edge(pl,x,y,C); if(!_e.b||_e.corner||((x+y)%3!==1)) continue; const X=PAD+x*CELL, Y=PAD+y*CELL; let ax,ay,bx,by;
+    if(_e.s==='l'){ ax=X+CELL; ay=Y+3; bx=ax+30; by=ay+16; } else if(_e.s==='r'){ ax=X; ay=Y+3; bx=ax-30; by=ay+16; } else if(_e.s==='t'){ ax=X+2; ay=Y+CELL; bx=ax+14; by=ay+30; } else { ax=X+2; ay=Y; bx=ax+14; by=ay-30; }
+    const sx=_e.v?0:12, sy=_e.v?10:0; const gg=c.createLinearGradient(ax,ay,bx,by); gg.addColorStop(0,'rgba(255,244,214,.2)'); gg.addColorStop(1,'rgba(255,244,214,0)'); c.fillStyle=gg; c.beginPath(); c.moveTo(ax,ay); c.lineTo(ax+sx,ay+sy); c.lineTo(bx+sx,by+sy); c.lineTo(bx,by); c.closePath(); c.fill(); }
   c.restore();
 }
 /* éditeur / aperçus : plan complet mis en cache */
 const PPC={key:'',cv:null};
-function paintPlanFull(c,C,pl,o){ paintPlan(c,C,pl,o); const VB=C.tabs.map(t=>({cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o})); drawTablesStatic(c,VB); paintLight(c,C,pl,VB,{amb:.2}); }
+function paintPlanFull(c,C,pl,o){ paintPlan(c,C,pl,o); const VB=C.tabs.map(t=>({cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o,tt:t.tt,z:t.z})); drawTablesStatic(c,VB); paintLight(c,C,pl,VB,{amb:.2}); }
 function planImage(pl,C,k){ const key=k+'|'+pl.g.join('')+JSON.stringify(pl.it)+Object.keys(S&&S.decor||{}).join(); if(PPC.key===key&&PPC.cv) return PPC.cv; const cv=PPC.cv||(PPC.cv=document.createElement('canvas')); cv.width=Math.ceil((pl.W*CELL+2*PAD)*k); cv.height=Math.ceil((pl.H*CELL+2*PAD)*k); const c=cv.getContext('2d'); c.setTransform(k,0,0,k,0,0); paintPlanFull(c,C,pl,{}); PPC.key=key; return cv; }
 function bgKeyNow(){ const L=layout(); return [R.layKey,SC.cw,SC.ch,SC.dpr,Object.keys(S.decor).join(),Object.keys(S.equip).join(),S.tabs.map(t=>t.jr?1:0).join('')].join('|'); }
 function drawBG(){
@@ -3631,7 +3631,7 @@ function drawBG(){
   c.setTransform(1,0,0,1,0,0); c.fillStyle='#1d1517'; c.fillRect(0,0,cv.width,cv.height);
   const sx=SC.scale*SC.dpr; c.setTransform(sx,0,0,sx,SC.ox*SC.dpr,SC.oy*SC.dpr); c.save(); c.beginPath(); c.rect(0,0,WW,WH); c.clip();
   paintPlan(c,C,S.plan,{L,lanes:true});
-  const VB=L.tb.map((t,i)=>({cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o}));
+  const VB=L.tb.map((t,i)=>({cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o,tt:t.tt,z:t.z,off:v99OffI(i)}));
   drawTablesStatic(c,VB,i=>S.tabs[i]&&S.tabs[i].jr&&sameRow(i,i+1));
   paintLight(c,C,S.plan,VB,{amb:S.decor.eclairage?.22:.32});
   if(S.decor.verriere){ c.fillStyle='rgba(230,246,255,.16)'; c.fillRect(PAD,PAD,C.W*CELL,C.H*CELL); }
@@ -3800,7 +3800,7 @@ function edViewLoad(pl){ try{ const v=JSON.parse(localStorage.getItem('bistrot_v
 function edViewSave(){ try{ if(ED.plan) localStorage.setItem('bistrot_view_ed',JSON.stringify({k:edViewKey(ED.plan),z:ED.zoom,ox:ED.ox,oy:ED.oy})); }catch(e){} }
 function edClamp(){ const pl=ED.plan, ww=(pl.W*CELL+2*PAD)*ED.scale, wh=(pl.H*CELL+2*PAD)*ED.scale; ED.ox=ww<=ED.cw?(ED.cw-ww)/2:clamp(ED.ox,ED.cw-ww-20,20); ED.oy=wh<=ED.ch?(ED.ch-wh)/2:clamp(ED.oy,ED.ch-wh-20,20); }
 function edZoom(f,cx,cy){ const old=ED.scale; ED.zoom=clamp(ED.zoom*f,0.5,5); ED.scale=ED.fs*ED.zoom; if(cx==null){ cx=ED.cw/2; cy=ED.ch/2; } const k=ED.scale/old; ED.ox=cx-(cx-ED.ox)*k; ED.oy=cy-(cy-ED.oy)*k; edClamp(); ED.dirty=true; }
-function edVB(C){ return C.tabs.map(t=>({cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o})); }
+function edVB(C){ return C.tabs.map(t=>({cx:t.cx,cy:t.cy,w:t.w,h:t.h,cap:t.cap,o:t.o,tt:t.tt,z:t.z})); }
 function edDraw(){
   ED.dirty=false; const cv=document.getElementById('edc'); if(!cv||!ED.plan) return; if(!ED.scale||ED.cw!==document.getElementById('edcv').clientWidth) edSize();
   const c=cv.getContext('2d'), pl=ED.plan, C=compilePlan(pl); c.setTransform(1,0,0,1,0,0); c.fillStyle='#1d1517'; c.fillRect(0,0,cv.width,cv.height);
@@ -3874,13 +3874,13 @@ function edAct(a,v){
 const TPL_KEY='bistrot_plans_v1';
 const tplList=()=>{ try{ return JSON.parse(localStorage.getItem(TPL_KEY)||'[]'); }catch(e){ return []; } };
 function tplWrite(l){ try{ localStorage.setItem(TPL_KEY,JSON.stringify(l)); }catch(e){} }
-function tplSave(name){ name=(name||'').trim()||('Plan '+(tplList().length+1)); const l=tplList().filter(t=>t.name!==name); const p=planClone(ED.plan); l.push({name,plan:{pid:p.pid,W:p.W,H:p.H,g:p.g,it:p.it}}); tplWrite(l); return name; }
+function tplSave(name){ name=(name||'').trim()||('Plan '+(tplList().length+1)); const l=tplList().filter(t=>t.name!==name); const p=planClone(ED.plan); l.push({name,plan:{pid:p.pid,W:p.W,H:p.H,g:p.g,it:p.it,sw:p.sw,dx:p.dx}}); tplWrite(l); return name; }
 function edTemplates(){
   const l=tplList();
   const body='<div style="text-align:left"><p class="muted">Enregistrez le plan actuel comme modèle personnel (conservé même après une nouvelle partie).</p><input id="tplname" class="ti" style="width:100%;text-align:left" maxlength="30" placeholder="Nom du modèle" value="">'+
     '<div style="margin-top:10px">'+(l.length?l.map((t,i)=>{ const ok=t.plan.W===ED.plan.W&&t.plan.H===ED.plan.H; return '<div class="row" style="padding:6px 0;border-top:1px solid #e7e2d9"><div class="grow"><b>'+t.name.replace(/</g,'&lt;')+'</b><small>'+t.plan.W+'×'+t.plan.H+(ok?'':' · autre taille de local')+'</small></div></div>'; }).join(''):'<p class="muted">Aucun modèle enregistré.</p>')+'</div></div>';
   const ch=[{label:'💾 Enregistrer le plan actuel',cb(){ const inp=document.getElementById('tplname'); const nm=tplSave(inp?inp.value:''); toast('Modèle « '+nm+' » enregistré.','good'); }}];
-  l.forEach((t,i)=>{ if(t.plan.W===ED.plan.W&&t.plan.H===ED.plan.H) ch.push({label:'📂 Charger « '+t.name+' »',cls:'ghost',cb(){ edSnap(); const p=t.plan; ED.plan={pid:p.pid,W:p.W,H:p.H,g:p.g.slice(),it:p.it.map(q=>Object.assign({},q)),ver:(ED.plan.ver||1)+1}; edRender(); toast('Modèle chargé.','good'); }}); });
+  l.forEach((t,i)=>{ if(t.plan.W===ED.plan.W&&t.plan.H===ED.plan.H) ch.push({label:'📂 Charger « '+t.name+' »',cls:'ghost',cb(){ edSnap(); const p=t.plan; ED.plan={pid:p.pid,W:p.W,H:p.H,g:p.g.slice(),it:p.it.map(q=>Object.assign({},q)),ver:(ED.plan.ver||1)+1,dx:(p.dx||[]).map(d=>Object.assign({},d))}; if(p.sw) ED.plan.sw=Object.assign({},p.sw); edRender(); toast('Modèle chargé.','good'); }}); });
   l.forEach((t,i)=>ch.push({label:'🗑️ Supprimer « '+t.name+' »',cls:'danger',cb(){ const nl=tplList().filter(x=>x.name!==t.name); tplWrite(nl); toast('Modèle supprimé.','info'); }}));
   ch.push({label:'Fermer',cls:'ghost',cb(){}});
   showPopup({icon:'📁',title:'Modèles de plan',body,choices:ch});
@@ -4299,7 +4299,7 @@ function trainCard(){
 /* ---------- accueil / programme ---------- */
 function progTasks(d){
   const pw=S.pw, T=[]; 
-  if(d===1||d===2){ const rc=pw.rc; if(d===1) T.push({m:1,e:'🪑',t:'Choisir ma table d’entretien',sub:rc.tab!=null?'Table '+(rc.tab+1)+' ✔':'Touchez une table sur le plan, puis confirmez',done:rc.tab!=null,a:'pickt',l:'Choisir'});
+  if(d===1||d===2){ const rc=pw.rc; if(d===1) T.push({m:1,e:'🪑',t:'Choisir ma table d’entretien',sub:rc.tab!=null?'Table '+v99TabN(rc.tab)+' ✔':'Touchez une table sur le plan, puis confirmez',done:rc.tab!=null,a:'pickt',l:'Choisir'});
     T.push({m:1,e:'🎤',t:'Journée d’entretiens (9h–13h · 14h–18h)',sub:rcSummary(d),done:!!(rc.end[d]||(d===2&&pw.teamOK)),a:'cands',l:'Candidats'}); }
   if(d===2){ const ps=pickState(); T.push({m:1,e:'👥',t:'Récapitulatif de l’équipe (1 clic)',sub:pw.teamOK?'Contrats signés ✔':ps.total+' / 16 retenus · salle '+ps.dep.sal+'/8 · cuisine '+ps.dep.cui+'/6 · nettoyage '+ps.dep.net+'/2',done:pw.teamOK,a:'team',l:'Récap'}); }
   if(d===3){ T.push({m:1,e:'📋',t:'Briefing : équipes, horaires, repos',sub:pw.brief?'Validé ✔':'Équipes bar 1 & 2, coupé, repos',done:pw.brief,a:'brief',l:'Ouvrir'});
@@ -5521,7 +5521,7 @@ function xOrder(day){ const pl=S.plan, side=UX.s, dp=UX.dp, pur=UX.p;
   spend(c,'invest'); XS().sched.push({id:nid(),start:day,ph,side,dp,pur,m2,c}); let n=0; try{ n=wkAfterPlan(); }catch(e){ console.error(e); }
   return {ok:true,msg:'Extension de '+m2+' m² ('+XPUR[pur].n.toLowerCase()+') programmée du '+dateShort(day)+' au '+dateShort(day+ph-1)+' · '+fm(c)+'.'+(n?' '+n+' client(s) appelé(s) (à emporter -10 % ou annulation : voir le journal).':'')}; }
 function v7ExtDay(){ const d=dayNum(), L=XS().sched; for(const s of L){ if(s.started||s.start>d) continue; if(S.trav){ s.start=d+1; note('🏗️ Extension repoussée d’un jour (autres travaux en cours).','warn'); continue; }
-    const np=xExtend(S.plan,s.side,s.dp); S.trav={start:d,end:d+s.ph-1,days:s.ph,cost:0,kitchen:s.pur==='cuisine',gros:true,prime:TYP.travprime.get(),plan:np,walls:true,ext:s.id}; s.started=true; note('🏗️ Début des travaux d’extension ('+s.m2+' m²).','info'); } }
+    const np=v99Ext(xExtend(S.plan,s.side,s.dp),s.pur); S.trav={start:d,end:d+s.ph-1,days:s.ph,cost:0,kitchen:s.pur==='cuisine',gros:true,prime:TYP.travprime.get(),plan:np,walls:true,ext:s.id}; s.started=true; note('🏗️ Début des travaux d’extension ('+s.m2+' m²).','info'); } }
 function v7ExtDone(T){ if(!T||!T.ext) return; const L=XS(); const s=L.sched.find(x=>x.id===T.ext); if(s){ L.sched=L.sched.filter(x=>x.id!==T.ext); L.done.push({m2:s.m2,pur:s.pur,day:dayNum()}); S.pw.ext=(S.pw.ext||0)+s.m2; note('🏗️ Extension terminée : +'+s.m2+' m² ('+XPUR[s.pur].n.toLowerCase()+'). Aménagez-la dans l’éditeur : Plan → Travaux.','good'); toast('Extension livrée : +'+s.m2+' m². À aménager dans l’éditeur de plan.','good'); } }
 function xCard(){ const pl=S.plan, X=XS(), tot=X.done.reduce((a,x)=>a+x.m2,0);
   return card('📐 Agrandir le local · '+pl.W+'×'+pl.H+' m','<p class="muted">Achetez des m² (salle, terrasse, cuisine, réserve, toilettes) puis aménagez-les dans l’éditeur de plan.'+(tot?' Déjà ajouté : <b>+'+tot+' m²</b>.':'')+(X.sched.length?' 🏗️ '+X.sched.length+' extension(s) programmée(s).':'')+'</p>'+btn('Acheter des m²','extopen',null,null,'primary')); }
@@ -6228,7 +6228,7 @@ function xFreeBase(pl){ return (pl.W<=10&&pl.H<=10); }
 { const _xp=xPrice; xPrice=function(pl,side,dp,pur){ const m2=xM2(pl,side,dp); const nW=(side==='right'||side==='left')?pl.W+dp:pl.W, nH=(side==='top'||side==='bottom')?pl.H+dp:pl.H;
   if(nW<=10&&nH<=10) return 0; /* reste dans 10×10 : gratuit */ return _xp(pl,side,dp,pur); }; }
 { const _xo=xOrder; xOrder=function(day){ if(S.pw&&S.pw.j0){ /* Jour 0 : gratuit auto */ const pl=S.plan, side=UX.s, dp=UX.dp, pur=UX.p, m2=xM2(pl,side,dp), ph=1;
-    const np=xExtend(pl,side,dp); applyPlanToState(S,np); XS().done.push({m2,pur,day:0,free:1}); note('📐 Extension Jour 0 gratuite : +'+m2+' m².','good'); return {ok:true,msg:'Extension gratuite (Jour 0) : +'+m2+' m².'}; }
+    const np=v99Ext(xExtend(pl,side,dp),pur); applyPlanToState(S,np); XS().done.push({m2,pur,day:0,free:1}); note('📐 Extension Jour 0 gratuite : +'+m2+' m².','good'); return {ok:true,msg:'Extension gratuite (Jour 0) : +'+m2+' m².'}; }
   return _xo(day); }; }
 
 /* Accueil hooks */
@@ -6718,7 +6718,7 @@ function v9DecorSig(){ if(!S) return ''; const u=(S.upg&&S.upg.on)||{}; return O
 { const _bk=bgKeyNow; bgKeyNow=function(){ return _bk()+'|'+v9DecorSig(); }; }
 function v9Walls(C,pl){ const W=C.W,H=C.H,out=[]; for(let y=0;y<H;y++) for(let x=0;x<W;x++){ if(pl.g[y][x]!=='W') continue;
     for(const [dx,dy] of [[0,1],[1,0],[0,-1],[-1,0]]){ const a=x+dx,b=y+dy; if(a<0||b<0||a>=W||b>=H) continue; const v=b*W+a; const ch=pl.g[b][a];
-      if((C.comp[v]===C.hall&&C.hall>=0&&(ch==='.'))||(C.occ[v]&&!(C.kit&&C.kit.has(C.comp[v])))){ out.push({x,y,dx,dy,border:(x===0||y===0||x===W-1||y===H-1)}); break; } } }
+      if((C.comp[v]===C.hall&&C.hall>=0&&(ch==='.'))||(C.occ[v]&&!(C.kit&&C.kit.has(C.comp[v]))&&!v99Out(ch))){ out.push({x,y,dx,dy,border:v99Edge(pl,x,y,C).b}); break; } } }
   return out; }
 const spread9=(L,n,off)=>{ const o=[]; if(!L.length) return o; for(let k=0;k<n;k++){ const i=Math.floor(((k+(off||0.5))/n)*L.length)%L.length; if(!o.includes(L[i])) o.push(L[i]); } return o; };
 /* position sur le bord intérieur du mur (côté salle) */
@@ -6769,7 +6769,7 @@ function v9Decor(c,C,pl){ if(!S||!C||!pl) return; try{
   if(has9('cellier')&&Ss.length){ const s=Ss[Ss.length-1], X=PAD+s.x*CELL, Y=PAD+s.y*CELL; c.fillStyle='#5a2a2a'; c.fillRect(X+1,Y+1,CELL-2,CELL-2); for(let i=0;i<3;i++) for(let j=0;j<3;j++){ c.fillStyle=(i+j)%2?'#7a1f2e':'#2f4a2a'; c.beginPath(); c.arc(X+4+i*4,Y+4+j*4,1.4,0,6.3); c.fill(); } }
   if(has9('fifo')) for(const s of Ss.slice(0,3)){ const X=PAD+s.x*CELL, Y=PAD+s.y*CELL; c.fillStyle='#fff6c0'; c.fillRect(X+CELL-6,Y+1.5,4.5,2.5); }
   // terrasse devant l'entrée (sur le trottoir) : parasols, chauffage, fleurs, terrasse chauffée
-  if(E){ const ox=E.ox||0, oy=E.oy||0; const cx=PAD+(E.x+.5)*CELL+ox*PAD*0.55, cy=PAD+(E.y+.5)*CELL+oy*PAD*0.55; const tx=oy?1:0, ty=ox?1:0; /* axe le long de la façade */
+  if(E&&!pl.sw){ const ox=E.ox||0, oy=E.oy||0; const cx=PAD+(E.x+.5)*CELL+ox*PAD*0.55, cy=PAD+(E.y+.5)*CELL+oy*PAD*0.55; const tx=oy?1:0, ty=ox?1:0; /* axe le long de la façade */
     const spot=k=>({x:cx+tx*CELL*k,y:cy+ty*CELL*k});
     if(dec9('terrasse')) for(const k of [-3,-2,2,3]){ const p=spot(k); c.fillStyle='#b07a4c'; c.beginPath(); c.arc(p.x,p.y,3.2,0,6.3); c.fill(); c.fillStyle='#2e2420'; for(const s of [-1,1]){ c.beginPath(); c.arc(p.x+s*4.2*tx+s*0*ty,p.y+s*4.2*ty,1.4,0,6.3); c.fill(); } }
     if(has9('parasols')) for(const k of [-2.5,2.5]){ const p=spot(k); c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.arc(p.x+1,p.y+1.5,6,0,6.3); c.fill(); for(let a=0;a<8;a++){ c.fillStyle=a%2?'#f4efe6':'#a3293c'; c.beginPath(); c.moveTo(p.x,p.y); c.arc(p.x,p.y,6,a*Math.PI/4,(a+1)*Math.PI/4); c.closePath(); c.fill(); } }
@@ -9624,7 +9624,7 @@ function v98ItemTxt(it,full){ const p=[]; if(it.cu){ let c=v98CuLab(it.cu).toLow
 /* ticket cuisine */
 function v98TicketCard(){ const L=S.tickets.filter(tk=>!tk.bar&&G(tk.g)); if(!L.length&&!S.groups.some(g=>g.state==='cook')) return '';
  const rows=L.slice(0,8).map(tk=>{ const g=G(tk.g), it=g.items[tk.i]; if(!it||!DISH[it.d]) return ''; const d=DISH[it.d]; const s=tk.w&&tk.w!=='P'?S.staff.find(x=>x.id===tk.w):null; const pct=tk.n0?clamp(Math.round((1-tk.need/tk.n0)*100),0,100):0;
-  return '<div class="v98tk"><span class="em">'+d.e+'</span><div class="grow"><b>'+(g.table!=null?'Table '+(g.table+1):'Comptoir')+' · '+d.n+'</b><div class="chips">'+(it.cu?'<span class="chip">'+V98CU[it.cu].e+' '+v98CuLab(it.cu)+'</span>':'')+(it.acc&&it.acc.length?it.acc.map(a=>'<span class="chip">'+V98SIDES[a].e+' '+V98SIDES[a].n+'</span>').join(''):'')+(it.sup?'<span class="chip ok">2ᵉ accompagnement +'+money2(it.sup)+'</span>':'')+(it.cuK&&it.cuK!=='rouge'?'<span class="chip warn">'+V98KIND[it.cuK]+' : à point ou bien cuite seulement</span>':'')+'</div><small>'+(s?'👨‍🍳 '+s.name:tk.w==='P'?'👤 vous':'⏳ en attente d’un cuisinier')+' · '+pct+' %</small><div class="v98pg"><i style="width:'+pct+'%"></i></div></div></div>'; }).join('');
+  return '<div class="v98tk"><span class="em">'+d.e+'</span><div class="grow"><b>'+(g.table!=null?'Table '+v99TabN(g.table):'Comptoir')+' · '+d.n+'</b><div class="chips">'+(it.cu?'<span class="chip">'+V98CU[it.cu].e+' '+v98CuLab(it.cu)+'</span>':'')+(it.acc&&it.acc.length?it.acc.map(a=>'<span class="chip">'+V98SIDES[a].e+' '+V98SIDES[a].n+'</span>').join(''):'')+(it.sup?'<span class="chip ok">2ᵉ accompagnement +'+money2(it.sup)+'</span>':'')+(it.cuK&&it.cuK!=='rouge'?'<span class="chip warn">'+V98KIND[it.cuK]+' : à point ou bien cuite seulement</span>':'')+'</div><small>'+(s?'👨‍🍳 '+s.name:tk.w==='P'?'👤 vous':'⏳ en attente d’un cuisinier')+' · '+pct+' %</small><div class="v98pg"><i style="width:'+pct+'%"></i></div></div></div>'; }).join('');
  return card('🧾 Tickets cuisine ('+L.length+')',(rows||'<p class="muted">Aucun plat en préparation.</p>')+(L.length>8?'<small class="muted">… et '+(L.length-8)+' autre(s).</small>':'')+'<p class="muted" style="margin:6px 0 0">Le serveur note la <b>cuisson</b> des viandes et l’<b>accompagnement</b> à la commande ; la volaille et le porc ne se servent qu’à point ou bien cuits.</p>'); }
 { const f=VIEWS.home; VIEWS.home=function(){ let h=f.apply(this,arguments); try{ const tc=v98TicketCard(); if(tc){ const m=h.match(/<section class="card ?[^"]*"><h3>📊 Indicateurs<\/h3>/); h=m?h.replace(m[0],tc+m[0]):h+tc; } }catch(e){ console.error(e); } return h; }; }
 /* ventes du jour / du mois */
@@ -9680,6 +9680,425 @@ ACT.v981slots=function(){ v96Parties(); };
 (function(){ const st=document.createElement('style'); st.textContent='#v96screen .v981bk{color:var(--bad,#b3261e);font-weight:700}#gameover .v981row{display:flex;gap:8px;align-items:stretch}#gameover .v981row .btn{margin:0}#gameover .v981row .btn.primary{flex:2}#gameover .v981row .btn.ghost{flex:1}'; document.head.appendChild(st); })();
 /* Au chargement d'une partie en faillite : montrer le bilan (bouton fonctionnel) plutôt que l'écran automatique « Mes parties » posé dessous. */
 { const f=loadGame; loadGame=function(){ const r=f(); if(r&&S&&S.over) v96Loaded=false; return r; }; }
+
+/* ===== v9.9 part a ===== */
+/* =====================================================================
+   v9.9 « TERRASSE » — A) données, géométrie du plan (trottoir, sol terrasse),
+   accroches compilePlan / xExtend / planClone, migration des anciennes parties
+   ===================================================================== */
+var V99={TT:{r2:2,k2:2,k4:4,md:2}, DX:{tj:1,tb:1,th:1,tp:1}, st:null};
+function v99IsTT(k){ return !!(k&&V99.TT[k]); }
+function v99Ord(pl,t){ return (t&&V99.TT[t.t])?1:0; }
+function v99Out(ch){ return ch===';'||ch===','; }
+/* bande trottoir : 3 rangées devant la façade de l'entrée (k=0 allée contre la façade, k=1 rangée des tables, k=2 bordure/trottoir extérieur portant l'entrée) */
+function v99Band(pl){ const s=pl&&pl.sw; if(!s||!s.side) return null; const W=pl.W,H=pl.H, side=s.side, hor=side==='top'||side==='bottom'; const L=hor?W:H;
+  const cell=(l,k)=> side==='bottom'?{x:l,y:H-3+k}: side==='top'?{x:l,y:2-k}: side==='right'?{x:W-3+k,y:l}:{x:2-k,y:l};
+  const fac=l=> side==='bottom'?{x:l,y:H-4}: side==='top'?{x:l,y:3}: side==='right'?{x:W-4,y:l}:{x:3,y:l};
+  const rect= side==='bottom'?{x0:0,y0:0,x1:W-1,y1:H-4}: side==='top'?{x0:0,y0:3,x1:W-1,y1:H-1}: side==='right'?{x0:0,y0:0,x1:W-4,y1:H-1}:{x0:3,y0:0,x1:W-1,y1:H-1};
+  const lk=(x,y)=>{ if(x<0||y<0||x>=W||y>=H) return null; if(side==='bottom') return y>=H-3?{l:x,k:y-(H-3)}:null; if(side==='top') return y<=2?{l:x,k:2-y}:null; if(side==='right') return x>=W-3?{l:y,k:x-(W-3)}:null; return x<=2?{l:y,k:2-x}:null; };
+  return {s:side,dl:s.dl,L,cell,fac,rect,lk,hor}; }
+function v99InBand(pl,x,y){ const B=v99Band(pl); return !!(B&&B.lk(x,y)); }
+/* case « extérieure » : sol terrasse, trottoir, ou mur/entrée de la bande trottoir */
+function v99OutCell(pl,x,y){ const ch=pget(pl,x,y); if(ch==null) return false; return v99Out(ch)||v99InBand(pl,x,y); }
+/* bord du bâtiment (pour fenêtres, rayons, rideaux) — identique à l'original sans trottoir */
+function v99Edge(pl,x,y,C){ const W=(C&&C.W)||pl.W, H=(C&&C.H)||pl.H; let R={x0:0,y0:0,x1:W-1,y1:H-1};
+  const B=pl&&pl.sw?v99Band(pl):null; if(B){ R=B.rect; if(B.lk(x,y)) return {b:false,corner:false,v:false,s:'b'}; }
+  const onL=x===R.x0, onR=x===R.x1, onT=y===R.y0, onB=y===R.y1; const b=(onL||onR||onT||onB)&&x>=R.x0&&x<=R.x1&&y>=R.y0&&y<=R.y1;
+  if(b&&pl&&pl.g){ for(const [a,c] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]) if(pget(pl,a,c)===';') return {b:false,corner:false,v:false,s:'b',rail:true}; }
+  return {b, corner:(onL||onR)&&(onT||onB), v:onL||onR, s:onL?'l':onR?'r':onT?'t':'b'}; }
+/* ajoute la bande trottoir devant l'entrée (si elle est sur un mur extérieur) ; keep = mobilier de trottoir à reposer (coordonnées l,k) */
+function v99AddSw(pl0,keep){ if(!pl0||pl0.sw||!pl0.g) return pl0; const W=pl0.W,H=pl0.H; let E=null;
+  for(let y=0;y<H&&!E;y++) for(let x=0;x<W;x++) if(pl0.g[y][x]==='E'){ E={x,y}; break; }
+  if(!E) return pl0; let side=null; if(E.y===H-1) side='bottom'; else if(E.y===0) side='top'; else if(E.x===W-1) side='right'; else if(E.x===0) side='left'; if(!side) return pl0;
+  const hor=side==='top'||side==='bottom', nW=hor?W:W+3, nH=hor?H+3:H, sx=side==='left'?3:0, sy=side==='top'?3:0, dl=hor?E.x:E.y;
+  const g=[]; for(let y=0;y<nH;y++) g.push(new Array(nW).fill('W'));
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++) g[y+sy][x+sx]=pl0.g[y][x];
+  const np={pid:pl0.pid,W:nW,H:nH,g:null,it:(pl0.it||[]).map(t=>({t:t.t,x:t.x+sx,y:t.y+sy,o:t.o?1:0})),ver:(pl0.ver||1)+1,sw:{side,dl},dx:(pl0.dx||[]).map(d=>({t:d.t,x:d.x+sx,y:d.y+sy}))};
+  const B=v99Band({W:nW,H:nH,sw:np.sw}); const L=B.L;
+  for(let l=0;l<L;l++){ for(let k=0;k<2;k++){ const c=B.cell(l,k); g[c.y][c.x]=(l===0||l===L-1)?'W':','; } const c=B.cell(l,2); g[c.y][c.x]='W'; }
+  { const c=B.cell(dl,2); g[c.y][c.x]='E'; const f=B.fac(dl); g[f.y][f.x]='D'; }
+  np.g=g.map(r=>r.join(''));
+  if(keep&&keep.side===side){ for(const t of keep.it||[]){ const c=B.cell(t.l,t.k); const o={t:t.t,x:c.x,y:c.y,o:t.o?1:0}; if(v99BandFits(np,o)) np.it.push(o); }
+    for(const d of keep.dx||[]){ if(d.l<0||d.l>=L) continue; const c=B.cell(d.l,d.k); if(pget(np,c.x,c.y)!=null) np.dx.push({t:d.t,x:c.x,y:c.y}); } }
+  return np; }
+function v99BandFits(pl,o){ const d=tdim(o); for(let yy=o.y;yy<o.y+d.h;yy++) for(let xx=o.x;xx<o.x+d.w;xx++){ if(pget(pl,xx,yy)!==','||tableAtCell(pl,xx,yy)) return false; } return v99SwRule(pl,o)===''; }
+/* règle du trottoir : rangée des tables (k=1) seulement, table parallèle à la façade, pas devant la porte */
+function v99SwRule(pl,o){ const B=v99Band(pl); if(!B) return ''; const d=tdim(o); let inb=false;
+  for(let yy=o.y;yy<o.y+d.h;yy++) for(let xx=o.x;xx<o.x+d.w;xx++){ const q=B.lk(xx,yy); if(!q) continue; inb=true; if(q.k!==1) return 'Sur le trottoir, les tables se posent sur la rangée extérieure (l’allée contre la façade reste libre).'; if(Math.abs(q.l-B.dl)<=1) return 'Laissez libre le passage devant la porte.'; }
+  if(inb&&((B.hor&&o.o)||(!B.hor&&!o.o))) return 'Sur le trottoir, placez la table parallèle à la façade (pivoter).';
+  return ''; }
+/* retire la bande trottoir (pour une extension) ; renvoie le plan « bâtiment seul » et le mobilier de trottoir */
+function v99Strip(pl){ const B=v99Band(pl); if(!B) return {pl,keep:null}; const R=B.rect, W0=R.x1-R.x0+1, H0=R.y1-R.y0+1;
+  const g=[]; for(let y=R.y0;y<=R.y1;y++) g.push(pl.g[y].slice(R.x0,R.x1+1).split(''));
+  const f=B.fac(B.dl), fx=f.x-R.x0, fy=f.y-R.y0; const hasE=g.some(r=>r.indexOf('E')>=0);
+  if(!hasE&&(g[fy][fx]==='D'||g[fy][fx]==='W')) g[fy][fx]='E'; else if(hasE&&g[fy][fx]==='D') g[fy][fx]='W';
+  const keep={side:B.s,it:[],dx:[]}, it=[], dx=[];
+  for(const t of pl.it){ const q=B.lk(t.x,t.y); if(q){ keep.it.push({t:t.t,l:q.l,k:q.k,o:t.o?1:0}); continue; } const d=tdim(t); if(t.x>=R.x0&&t.y>=R.y0&&t.x+d.w-1<=R.x1&&t.y+d.h-1<=R.y1) it.push({t:t.t,x:t.x-R.x0,y:t.y-R.y0,o:t.o?1:0}); }
+  for(const d of pl.dx||[]){ const q=B.lk(d.x,d.y); if(q){ keep.dx.push({t:d.t,l:q.l,k:q.k}); continue; } if(d.x>=R.x0&&d.y>=R.y0&&d.x<=R.x1&&d.y<=R.y1) dx.push({t:d.t,x:d.x-R.x0,y:d.y-R.y0}); }
+  return {pl:{pid:pl.pid,W:W0,H:H0,g:g.map(r=>r.join('')),it,dx,ver:(pl.ver||1)+1},keep}; }
+/* ---------- accroches plan ---------- */
+{ const f=planClone; planClone=function(pl){ const r=f(pl); try{ if(pl&&pl.sw) r.sw={side:pl.sw.side,dl:pl.sw.dl}; if(pl&&pl.dx) r.dx=pl.dx.map(d=>({t:d.t,x:d.x,y:d.y})); }catch(e){} return r; }; }
+{ const f=xExtend; xExtend=function(pl,side,dp){
+    const st=(pl&&pl.sw)?v99Strip(pl):{pl,keep:null}; const p0=st.pl; const np0=f(p0,side,dp);
+    const ox=side==='left'?dp:0, oy=side==='top'?dp:0; np0.dx=(p0.dx||[]).map(d=>({t:d.t,x:d.x+ox,y:d.y+oy}));
+    const W=p0.W,H=p0.H, nu=[]; for(let y=1;y<np0.H-1;y++) for(let x=1;x<np0.W-1;x++){ const isN=side==='right'?x>=W-1:side==='left'?x<=dp:side==='bottom'?y>=H-1:y<=dp; if(isN&&np0.g[y][x]==='.') nu.push([x,y]); }
+    if(!st.keep){ np0.v99new=nu; return np0; }
+    const bh=st.keep.side==='top'||st.keep.side==='bottom'; const sh=((bh&&side==='left')||(!bh&&side==='top'))?dp:0;
+    const keep={side:st.keep.side,it:st.keep.it.map(t=>Object.assign({},t,{l:t.l+sh})),dx:st.keep.dx.map(d=>Object.assign({},d,{l:d.l+sh}))};
+    const np=v99AddSw(np0,keep); if(np===np0){ np0.v99new=nu; return np0; }
+    const sx=np.sw.side==='left'?3:0, sy=np.sw.side==='top'?3:0; np.v99new=nu.map(([x,y])=>[x+sx,y+sy]); return np; }; }
+{ const f=xM2; xM2=function(pl,side,dp){ return f(pl&&pl.sw?v99Strip(pl).pl:pl,side,dp); }; }
+{ const f=xLen; xLen=function(pl,side){ return f(pl&&pl.sw?v99Strip(pl).pl:pl,side); }; }
+/* extension « terrasse » : ses cases deviennent du sol terrasse */
+function v99Ext(np,pur){ try{ if(np&&np.v99new){ if(pur==='terrasse') for(const [x,y] of np.v99new) if(pget(np,x,y)==='.'&&!tableAtCell(np,x,y)) pset(np,x,y,';'); delete np.v99new; } }catch(e){ console.error(e); } return np; }
+/* jour 0 terminé (nouvelle partie, déménagement) : le trottoir est ajouté devant l'entrée */
+{ const f=v6FinishJ0; v6FinishJ0=function(plan){ let p=plan; try{ p=v99AddSw(plan); }catch(e){ console.error(e); } return f.call(this,p); }; }
+/* ---------- conversion des anciens décors terrasse en mobilier ---------- */
+const V99CONV={ terrasse:{n:'Terrasse chauffée',tab:2,th:2}, parasols:{n:'Parasols',tp:2,tj:2}, chauff:{n:'Chauffages',th:2}, fleurs:{n:'Fleurs',tj:2} };
+function v99ConvOn(k){ try{ return k==='terrasse'?dec9('terrasse'):has9(k); }catch(e){ return false; } }
+function v99PlaceConv(pl,spec){ const B=v99Band(pl); if(!B) return {tabs:0}; const L=B.L, dl=B.dl; let tabs=0; pl.dx=pl.dx||[];
+  const order=[]; for(let l=1;l<L-1;l++) order.push(l); order.sort((a,b)=>Math.abs(a-dl)-Math.abs(b-dl)||a-b);
+  const dxAt=(l,k)=>{ const c=B.cell(l,k); return pl.dx.some(d=>d.x===c.x&&d.y===c.y); };
+  for(let n=0;n<(spec.tab||0);n++){ for(const l of order){ const c=B.cell(l,1); const o={t:'r2',x:c.x,y:c.y,o:B.hor?0:1}; if(!B.hor){ o.x=c.x; o.y=c.y; } if(v99BandFits(pl,o)&&!dxAt(l,1)&&!dxAt(l+1,1)){ pl.it.push(o); tabs++; break; } } }
+  const put=(t,k,cnt)=>{ for(let n=0;n<cnt;n++){ for(const l of order){ if(Math.abs(l-dl)<=1) continue; const c=B.cell(l,k); if(dxAt(l,k)) continue; if(k===1&&(pget(pl,c.x,c.y)!==','||tableAtCell(pl,c.x,c.y))) continue; if(k===2&&pget(pl,c.x,c.y)!=='W') continue; pl.dx.push({t,x:c.x,y:c.y}); break; } } };
+  put('th',1,spec.th||0); put('tj',2,spec.tj||0);
+  for(let n=0;n<(spec.tp||0);n++){ const T=pl.it.filter(t=>V99.TT[t.t]&&B.lk(t.x,t.y)&&!pl.dx.some(d=>d.t==='tp'&&d.x===t.x&&d.y===t.y)); if(T.length){ const t=T[0]; pl.dx.push({t:'tp',x:t.x,y:t.y}); } else put('tp',1,1); }
+  return {tabs}; }
+function v99Convert(s){ s=s||S; if(!s||!s.plan||!s.plan.sw) return []; s.pw=s.pw||{}; const done=s.pw.v99conv=s.pw.v99conv||{}; const got=[];
+  for(const k of Object.keys(V99CONV)){ if(done[k]||!v99ConvOn(k)) continue; done[k]=1; const pl=planClone(s.plan); const r=v99PlaceConv(pl,V99CONV[k]);
+    const C0=compilePlan(s.plan), n0=C0.tabs.length; pl.ver=(s.plan.ver||1)+1; s.plan=pl; const C1=compilePlan(pl);
+    if(C1.tabs.length!==n0){ const old=s.tabs||[]; const nt=C1.tabs.map((t,i)=>i<old.length&&old[i]&&old[i].cap===t.cap?old[i]:{cap:t.cap,g:null,jr:false,hold:null}); s.tabs=nt; s.tables=nt.length; }
+    s.planKey=(s.planKey||0)+1; try{ R.lay=null; R.layKey=''; PPC.key=''; }catch(e){} got.push(V99CONV[k].n); }
+  return got; }
+/* ---------- migration (idempotente) ---------- */
+function v99Migrate(s){ if(!s) return s; s.pw=s.pw||{}; if(!s.pw.v99){
+    if(!s.pw.j0&&s.plan&&!s.plan.sw){ const np=v99AddSw(s.plan); if(np!==s.plan){ const old=s.tabs; s.plan=np; if(!old||old.length!==compilePlan(np).tabs.length){ s.tabs=tabsFromPlan(np); s.tables=s.tabs.length; } s.planKey=(s.planKey||0)+1; try{ R.lay=null; R.layKey=''; }catch(e){} } }
+    if(s.trav&&s.trav.plan&&!s.trav.plan.sw&&!s.pw.j0){ try{ const T=s.trav, sc=((s.ext&&s.ext.sched)||[]).find(x=>x.id===T.ext);
+        /* extension « terrasse » déjà commencée dans une ancienne version : les nouvelles cases deviennent sol de terrasse */
+        if(sc&&sc.pur==='terrasse'&&s.plan){ const W=s.plan.W,H=s.plan.H,side=sc.side,np=T.plan,dp=(side==='left'||side==='right')?np.W-W:np.H-H; np.g=np.g.map(r=>typeof r==='string'?r:r.join(''));
+          if(dp>0) for(let y=1;y<np.H-1;y++) for(let x=1;x<np.W-1;x++){ const isN=side==='right'?x>=W-1:side==='left'?x<=dp:side==='bottom'?y>=H-1:y<=dp; if(isN&&np.g[y][x]==='.'&&!tableAtCell(np,x,y)) pset(np,x,y,';'); } }
+      }catch(e){ console.error(e); } s.trav.plan=v99AddSw(s.trav.plan); }
+    if(s.v94plan&&!s.v94plan.sw&&!s.pw.j0) s.v94plan=v99AddSw(s.v94plan);
+    for(const st of s.staff||[]) if(st.v99z==null&&(st.role==='waiter'||st.role==='bar')) st.v99z='s';
+    for(const r of s.res||[]) if(!r.zone) r.zone='int';
+    for(const q of s.resReq||[]) if(!q.zone) q.zone='int';
+    s.pw.v99=1; }
+  try{ if(s===S&&s.plan&&s.plan.sw){ const got=v99Convert(s); if(got.length) s.pw.v99convMsg=got; } }catch(e){ console.error(e); }
+  return s; }
+{ const f=newState; newState=function(){ const s=f.apply(this,arguments); try{ s.pw=s.pw||{}; s.pw.v99=1; s.pw.v99conv={}; }catch(e){ console.error(e); } return s; }; }
+{ const f=fixSave; fixSave=function(){ const r=f.apply(this,arguments); try{ v99Migrate(S); v99Sync(true); }catch(e){ console.error(e); } return r; }; }
+
+/* ===== v9.9 part b ===== */
+/* =====================================================================
+   v9.9 « TERRASSE » — B) dessin (sol extérieur, trottoir, mobilier, météo) + éditeur
+   ===================================================================== */
+const V99D={
+ chairRattan(c,x,y,a){ c.save(); c.translate(x,y); c.rotate(a||0); c.fillStyle='rgba(0,0,0,.18)'; rr(c,-2.6,-2.2,6,5.6,1.6); c.fill();
+   c.fillStyle='#c9a064'; rr(c,-3,-2.8,6,5.6,1.8); c.fill(); c.strokeStyle='#8a6633'; c.lineWidth=.35; for(let k=-2;k<=2;k+=1.3){ c.beginPath(); c.moveTo(-2.6,k); c.lineTo(2.6,k+.6); c.stroke(); c.beginPath(); c.moveTo(k,-2.4); c.lineTo(k+.6,2.4); c.stroke(); }
+   c.fillStyle='#7a5426'; c.beginPath(); c.arc(0,-2.6,3,Math.PI*1.05,Math.PI*1.95); c.lineTo(0,-2.6); c.fill(); c.restore(); },
+ chairTeak(c,x,y,a){ c.save(); c.translate(x,y); c.rotate(a||0); c.fillStyle='rgba(0,0,0,.18)'; c.fillRect(-2.4,-2,5.6,5.4);
+   c.fillStyle='#a06a37'; c.fillRect(-2.8,-2.6,5.6,5.4); c.fillStyle='#7b4c22'; for(let k=-2;k<2.6;k+=1.4) c.fillRect(-2.8,k,5.6,.45); c.fillStyle='#6b3f1a'; c.fillRect(-2.9,-3.4,5.8,1.3); c.restore(); },
+ stool(c,x,y){ c.fillStyle='rgba(0,0,0,.2)'; c.beginPath(); c.arc(x+.6,y+.8,2.4,0,6.3); c.fill(); c.fillStyle='#2f3439'; c.beginPath(); c.arc(x,y,2.4,0,6.3); c.fill(); c.fillStyle='#6d757d'; c.beginPath(); c.arc(x-.5,y-.5,1.1,0,6.3); c.fill(); },
+ roundT(c,x,y,r){ r=r||4.6; c.fillStyle='rgba(0,0,0,.22)'; c.beginPath(); c.arc(x+1,y+1.3,r,0,6.3); c.fill(); c.fillStyle='#3f474e'; c.beginPath(); c.arc(x,y,r,0,6.3); c.fill();
+   const g=c.createRadialGradient(x-1.4,y-1.4,0,x,y,r); g.addColorStop(0,'#d7dde2'); g.addColorStop(1,'#8b969f'); c.fillStyle=g; c.beginPath(); c.arc(x,y,r-.8,0,6.3); c.fill(); c.strokeStyle='rgba(60,70,80,.5)'; c.lineWidth=.35; c.beginPath(); c.arc(x,y,Math.max(.5,r-2),0,6.3); c.stroke(); },
+ teakT(c,x,y,w,h){ c.fillStyle='rgba(0,0,0,.22)'; rr(c,x-w/2+1,y-h/2+1.3,w,h,1.4); c.fill(); c.fillStyle='#b17a43'; rr(c,x-w/2,y-h/2,w,h,1.4); c.fill(); c.strokeStyle='#7f5126'; c.lineWidth=.45;
+   if(w>=h) for(let k=1;k<4;k++){ const yy=y-h/2+k*h/4; c.beginPath(); c.moveTo(x-w/2+.6,yy); c.lineTo(x+w/2-.6,yy); c.stroke(); } else for(let k=1;k<4;k++){ const xx=x-w/2+k*w/4; c.beginPath(); c.moveTo(xx,y-h/2+.6); c.lineTo(xx,y+h/2-.6); c.stroke(); } },
+ highT(c,x,y,r){ r=r||3.6; c.fillStyle='rgba(0,0,0,.25)'; c.beginPath(); c.arc(x+1.2,y+1.6,r,0,6.3); c.fill(); c.fillStyle='#24282d'; c.beginPath(); c.arc(x,y,r,0,6.3); c.fill(); c.fillStyle='#4f565e'; c.beginPath(); c.arc(x-.6,y-.6,r*.66,0,6.3); c.fill(); },
+ planter(c,x,y,w,h){ c.fillStyle='rgba(0,0,0,.2)'; rr(c,x-w/2+.8,y-h/2+1,w,h,1); c.fill(); c.fillStyle='#b8693c'; rr(c,x-w/2,y-h/2,w,h,1); c.fill(); c.fillStyle='#8c4a26'; c.fillRect(x-w/2,y+h/2-1,w,1);
+   const vert=h>w, n=Math.max(2,Math.round((vert?h:w)/3.2)); for(let i=0;i<n;i++){ const px=vert?x:x-w/2+(i+.5)*w/n, py=vert?y-h/2+(i+.5)*h/n:y-.4; c.fillStyle=i%2?'#3f8a46':'#4f9c4f'; c.beginPath(); c.arc(px,py,Math.min(2.3,(vert?w:h)*.55),0,6.3); c.fill(); if(i%2===0){ c.fillStyle=['#e84a6f','#ffd34d','#b05ae8','#ff8a3d'][i%4]; c.beginPath(); c.arc(px+.6,py-.6,0.9,0,6.3); c.fill(); } } },
+ bac(c,x,y){ c.fillStyle='rgba(0,0,0,.22)'; c.fillRect(x-3.2,y-2.6,7,7); c.fillStyle='#e9e3d6'; c.fillRect(x-3.6,y-3.6,7.2,7.2); c.fillStyle='#c9c0ae'; c.fillRect(x-3.6,y+2.6,7.2,1);
+   for(let a=0;a<7;a++){ c.fillStyle=a%2?'#7f9c6c':'#97b383'; c.beginPath(); c.arc(x+Math.cos(a*.9)*2.6,y+Math.sin(a*.9)*2.6-.6,2.4,0,6.3); c.fill(); } },
+ heater(c,x,y,on){ if(on){ const g=c.createRadialGradient(x,y,0,x,y,13); g.addColorStop(0,'rgba(255,140,40,.6)'); g.addColorStop(1,'rgba(255,140,40,0)'); c.fillStyle=g; c.beginPath(); c.arc(x,y,13,0,6.3); c.fill(); }
+   c.fillStyle='rgba(0,0,0,.25)'; c.beginPath(); c.arc(x+.8,y+1,3.4,0,6.3); c.fill(); c.fillStyle='#5b6168'; c.beginPath(); c.arc(x,y,3.4,0,6.3); c.fill(); c.fillStyle='#9aa1a8'; c.beginPath(); c.arc(x,y,1.8,0,6.3); c.fill(); if(on){ c.fillStyle='#ff9b3d'; c.beginPath(); c.arc(x,y,.9,0,6.3); c.fill(); } },
+ parasol(c,x,y,open,R){ R=R||10.5; if(open){ c.fillStyle='rgba(0,0,0,.16)'; c.beginPath(); c.arc(x+2.2,y+2.8,R,0,6.3); c.fill(); c.save(); c.globalAlpha=.9;
+     for(let a=0;a<8;a++){ c.fillStyle=a%2?'#f4efe6':'#a3293c'; c.beginPath(); c.moveTo(x,y); c.arc(x,y,R,a*Math.PI/4,(a+1)*Math.PI/4); c.closePath(); c.fill(); } c.restore();
+     c.strokeStyle='rgba(90,20,30,.55)'; c.lineWidth=.4; c.beginPath(); c.arc(x,y,R,0,6.3); c.stroke(); c.fillStyle='#e8d9b0'; c.beginPath(); c.arc(x,y,1,0,6.3); c.fill(); }
+   else { c.fillStyle='rgba(0,0,0,.2)'; c.beginPath(); c.arc(x+.8,y+1,2.4,0,6.3); c.fill(); c.fillStyle='#a3293c'; c.beginPath(); c.arc(x,y,2.3,0,6.3); c.fill(); c.strokeStyle='#f4efe6'; c.lineWidth=.6; c.beginPath(); c.moveTo(x-1.6,y-1.6); c.lineTo(x+1.6,y+1.6); c.stroke(); c.fillStyle='#e8d9b0'; c.beginPath(); c.arc(x,y,.7,0,6.3); c.fill(); } }
+};
+function v99Wet(){ try{ return !!(S&&S.plan&&v99Day().w.k==='rain'); }catch(e){ return false; } }
+const v99H=(x,y)=>((x*73856093)^(y*19349663))>>>0;
+function v99Pavers(c,X,Y,x,y,wet){ const h=v99H(x,y); c.fillStyle=wet?(h%3?'#9c968a':'#918b80'):(h%3?'#e2d8c3':'#d8cdb6'); c.fillRect(X,Y,CELL,CELL); c.fillStyle=wet?'rgba(40,40,50,.25)':'rgba(120,100,70,.28)'; c.fillRect(X,Y,CELL,.6); c.fillRect(X,Y,.6,CELL); c.fillRect(X+CELL/2,Y+(y%2?0:CELL/2),.5,CELL/2); }
+function v99Slabs(c,X,Y,x,y,wet){ const h=v99H(x,y); c.fillStyle=wet?(h%4?'#6f747a':'#696e74'):(h%4?'#a9adb1':'#a2a6aa'); c.fillRect(X,Y,CELL,CELL); c.fillStyle=wet?'rgba(20,25,35,.35)':'rgba(70,75,80,.35)'; c.fillRect(X,Y,CELL,.6); c.fillRect(X,Y,.6,CELL); }
+/* sol des cases extérieures (appelé par paintPlan) */
+function v99Floor(c,pl,x,y,ch,X,Y){ if(ch===';'){ v99Pavers(c,X,Y,x,y,v99Wet()); return true; } if(ch===','){ v99Slabs(c,X,Y,x,y,v99Wet()); return true; } return false; }
+/* murs de la bande trottoir (bordure, extrémités, entrée) et garde-corps de terrasse */
+function v99FloorW(c,pl,C){ if(!pl) return; const B=v99Band(pl), wet=v99Wet(); const hasT=pl.g.some(r=>r.indexOf(';')>=0); if(!B&&!hasT) return;
+  for(let y=0;y<pl.H;y++) for(let x=0;x<pl.W;x++){ const ch=pl.g[y][x]; if(ch!=='W'&&ch!=='E') continue; const X=PAD+x*CELL, Y=PAD+y*CELL; const q=B&&B.lk(x,y);
+    if(q){ v99Slabs(c,X,Y,x,y,wet); if(ch==='E'){ c.fillStyle='#8f2330'; rr(c,X+2,Y+2,CELL-4,CELL-4,2); c.fill(); c.fillStyle='rgba(255,220,180,.5)'; c.fillRect(X+3.5,Y+CELL/2-.3,CELL-7,.6); } continue; }
+    if(ch==='W'&&v99Edge(pl,x,y,C).rail){ v99Pavers(c,X,Y,x,y,wet); const e=v99RailDir(pl,x,y); c.strokeStyle='#2b2b2e'; c.lineWidth=1.1; c.beginPath();
+      if(e.h){ c.moveTo(X,Y+CELL/2); c.lineTo(X+CELL,Y+CELL/2); } else { c.moveTo(X+CELL/2,Y); c.lineTo(X+CELL/2,Y+CELL); } c.stroke(); c.lineWidth=.5;
+      for(let k=1;k<CELL;k+=3){ c.beginPath(); if(e.h){ c.moveTo(X+k,Y+CELL/2-1.6); c.lineTo(X+k,Y+CELL/2+1.6); } else { c.moveTo(X+CELL/2-1.6,Y+k); c.lineTo(X+CELL/2+1.6,Y+k); } c.stroke(); } } }
+  if(B){ // bordure de trottoir + chaussée dans la marge
+    const a=B.cell(0,2), b=B.cell(B.L-1,2); const x0=PAD+Math.min(a.x,b.x)*CELL, y0=PAD+Math.min(a.y,b.y)*CELL, x1=PAD+(Math.max(a.x,b.x)+1)*CELL, y1=PAD+(Math.max(a.y,b.y)+1)*CELL;
+    c.fillStyle=wet?'#2e3238':'#3c4046'; c.fillStyle; const road=wet?'#2e3238':'#3c4046';
+    if(B.s==='bottom'){ c.fillStyle='#d6d6d0'; c.fillRect(x0,y1-1.6,x1-x0,1.6); c.fillStyle=road; c.fillRect(0,y1,x1+PAD,PAD); c.fillStyle='rgba(255,255,255,.7)'; for(let xx=PAD;xx<x1;xx+=14) c.fillRect(xx,y1+PAD/2-.5,7,1); }
+    else if(B.s==='top'){ c.fillStyle='#d6d6d0'; c.fillRect(x0,y0,x1-x0,1.6); c.fillStyle=road; c.fillRect(0,0,x1+PAD,PAD); c.fillStyle='rgba(255,255,255,.7)'; for(let xx=PAD;xx<x1;xx+=14) c.fillRect(xx,PAD/2-.5,7,1); }
+    else if(B.s==='right'){ c.fillStyle='#d6d6d0'; c.fillRect(x1-1.6,y0,1.6,y1-y0); c.fillStyle=road; c.fillRect(x1,0,PAD,y1+PAD); c.fillStyle='rgba(255,255,255,.7)'; for(let yy=PAD;yy<y1;yy+=14) c.fillRect(x1+PAD/2-.5,yy,1,7); }
+    else { c.fillStyle='#d6d6d0'; c.fillRect(x0,y0,1.6,y1-y0); c.fillStyle=road; c.fillRect(0,0,PAD,y1+PAD); c.fillStyle='rgba(255,255,255,.7)'; for(let yy=PAD;yy<y1;yy+=14) c.fillRect(PAD/2-.5,yy,1,7); } } }
+function v99RailDir(pl,x,y){ const l=pget(pl,x-1,y)===';'||pget(pl,x+1,y)===';'; const v=pget(pl,x,y-1)===';'||pget(pl,x,y+1)===';'; return {h:v&&!l?true:!l&&!v?true:v}; }
+/* paintPlan : ne pas dessiner ces murs en briques */
+function v99Skip(pl,x,y,ch){ if(ch!=='W'&&ch!=='E') return false; if(v99InBand(pl,x,y)) return true; return ch==='W'&&!!v99Edge(pl,x,y).rail; }
+/* lumière : l'extérieur n'est pas assombri */
+function v99Punch(t,C,pl){ if(!pl) return; const B=v99Band(pl); t.globalAlpha=.97; t.fillStyle='#000';
+  for(let y=0;y<C.H;y++) for(let x=0;x<C.W;x++){ const ch=pl.g[y][x]; if(v99Out(ch)||(B&&B.lk(x,y))||(ch==='W'&&v99Edge(pl,x,y,C).rail)) t.fillRect(PAD+x*CELL-1,PAD+y*CELL-1,CELL+2,CELL+2); }
+  if(B){ const a=B.cell(0,2), b=B.cell(B.L-1,2); t.fillRect(PAD+Math.min(a.x,b.x)*CELL-PAD,PAD+Math.min(a.y,b.y)*CELL-PAD,(Math.abs(a.x-b.x)+1)*CELL+2*PAD,(Math.abs(a.y-b.y)+1)*CELL+2*PAD); }
+  t.globalAlpha=1; }
+/* tables de terrasse */
+function v99TabN(i){ try{ const C=compilePlan(S.plan); const t=C.tabs[i]; if(!t) return String(i+1); if(t.z!=='ter') return String(i+1); let n=0; for(let j=0;j<=i;j++) if(C.tabs[j].z==='ter') n++; return 'E'+n; }catch(e){ return String(i+1); } }
+function v99DrawTab(c,t,lab){ const ty=t.tt, off=!!t.off; const ss=seatsOf(t);
+  const ang=s=>Math.atan2(s.x-s.tx,-(s.y-s.ty)); const chair=ty==='r2'?V99D.chairRattan:V99D.chairTeak;
+  const top=()=>{ if(ty==='r2') V99D.roundT(c,t.cx,t.cy,6.4); else if(ty==='md') V99D.highT(c,t.cx,t.cy,5); else { const w=t.o?t.w*0.42+4:t.w-6, h=t.o?t.h-6:t.h*0.42+4; V99D.teakT(c,t.cx,t.cy,t.o?Math.min(w,12):w,t.o?h:Math.min(h,12)); } };
+  if(!off){ c.save(); c.translate(0,0); for(const s of ss){ if(ty==='md') V99D.stool(c,s.x+(s.tx-s.x)*.25,s.y+(s.ty-s.y)*.25); else { c.save(); c.translate(s.x,s.y); c.scale(1.3,1.3); chair(c,0,0,ang(s)); c.restore(); } } c.restore(); top(); }
+  else { top(); if(ty==='md'){ V99D.stool(c,t.cx-4,t.cy+5); V99D.stool(c,t.cx+4,t.cy+5); } else { const n=Math.min(2,ss.length); for(let k=0;k<n;k++){ c.save(); c.translate(t.cx+(k?2.2:-2.2),t.cy+(k?1:-1)); c.scale(1.05,1.05); chair(c,0,0,k?Math.PI+.35:.35); c.restore(); } } }
+  txt(c,lab,t.cx-(t.o?0:(t.cap>=4?17:9)),t.cy+(t.o?(t.cap>=4?-17:-9):0.3),5.1,off?'rgba(80,80,90,.85)':'rgba(30,70,40,.92)','800'); }
+{ const f=drawTablesStatic; drawTablesStatic=function(c,VB,jr){ let n0=VB.findIndex(v=>v&&v.tt&&V99.TT[v.tt]); if(n0<0) return f(c,VB,jr);
+    f(c,VB.slice(0,n0),jr); try{ let e=0; for(let i=n0;i<VB.length;i++){ const t=VB[i]; if(jr&&i<VB.length-1&&jr(i)){ const A=t,B=VB[i+1]; c.fillStyle='#9c6a38'; if(!A.o) c.fillRect(A.cx,A.cy-3,B.cx-A.cx,6); else c.fillRect(A.cx-3,A.cy,6,B.cy-A.cy); } }
+      for(let i=n0;i<VB.length;i++){ e++; v99DrawTab(c,VB[i],'E'+e); } }catch(err){ console.error('v99 tables',err); } }; }
+/* bougies : seulement en salle */
+{ const f=drawTables; drawTables=function(c,VB){ try{ const C=compilePlan(S.plan); if(C.tabs.some(t=>t.z==='ter')) return f(c,VB.filter((t,i)=>!(C.tabs[i]&&C.tabs[i].z==='ter'))); }catch(e){} return f(c,VB); }; }
+/* décor extérieur : pluie, parasols, chauffages, jardinières, plaque Michelin, repères de l'éditeur */
+function v99Decor(c,C,pl){ if(!pl||!pl.g) return; const B=v99Band(pl), dx=pl.dx||[]; const hasT=pl.g.some(r=>r.indexOf(';')>=0); if(!B&&!hasT&&!dx.length) return;
+  let st=null; try{ st=v99Day(); }catch(e){} const wet=!!(st&&st.w&&st.w.k==='rain'); const inEd=typeof ED!=='undefined'&&ED.open&&pl===ED.plan;
+  const outs=[]; for(let y=0;y<pl.H;y++) for(let x=0;x<pl.W;x++){ const ch=pl.g[y][x]; if(v99Out(ch)||(B&&B.lk(x,y))) outs.push([x,y]); }
+  if(wet){ c.save(); c.fillStyle='rgba(120,150,190,.10)'; for(const [x,y] of outs) c.fillRect(PAD+x*CELL,PAD+y*CELL,CELL,CELL);
+    c.fillStyle='rgba(150,180,210,.28)'; for(const [x,y] of outs){ const h=v99H(x,y); if(h%5===0){ c.beginPath(); c.ellipse(PAD+(x+.5)*CELL,PAD+(y+.5)*CELL,6,2.6,0,0,6.3); c.fill(); } } c.restore(); }
+  const ctr=d=>({x:PAD+(d.x+.5)*CELL,y:PAD+(d.y+.5)*CELL});
+  for(const d of dx){ const p=ctr(d); if(d.t==='tj'){ const vert=B&&!B.hor&&B.lk(d.x,d.y); V99D.planter(c,p.x,p.y,vert?6:CELL-2,vert?CELL-2:6); } else if(d.t==='tb'){ c.save(); c.translate(p.x,p.y); c.scale(1.4,1.4); V99D.bac(c,0,0); c.restore(); } else if(d.t==='th'){ c.save(); c.translate(p.x,p.y); c.scale(1.3,1.3); V99D.heater(c,0,0,!!(st&&st.heatOn&&!inEd)); c.restore(); } }
+  for(const d of dx) if(d.t==='tp'){ const p=ctr(d); const tab=tableAtCell(pl,d.x,d.y); let q=p; if(tab){ const dd=tdim(tab); q={x:PAD+(tab.x+dd.w/2)*CELL,y:PAD+(tab.y+dd.h/2)*CELL}; } V99D.parasol(c,q.x,q.y,inEd?true:!!(st&&st.par),13); }
+  if(wet&&!inEd){ c.save(); c.strokeStyle='rgba(190,215,240,.5)'; c.lineWidth=.6; let h=7; const n=Math.min(900,outs.length*4); for(let i=0;i<n;i++){ h=(h*1103515245+12345)>>>0; const o=outs[h%outs.length]; h=(h*1103515245+12345)>>>0; const x=PAD+(o[0]+(h%100)/100)*CELL, y=PAD+(o[1]+((h>>>8)%100)/100)*CELL; c.beginPath(); c.moveTo(x,y); c.lineTo(x-1.6,y+4); c.stroke(); } c.restore(); }
+  if(B&&S&&S.mich&&S.mich.star){ const f=B.fac(B.dl), l=B.cell(B.dl-1,0); const x=PAD+(l.x+.5)*CELL, y=PAD+(l.y+.5)*CELL; c.fillStyle='#b22c2c'; rr(c,x-3,y-3,6,6,1); c.fill(); txt(c,'★',x,y+.3,5,'#fff','900'); void f; }
+  if(inEd){ c.save(); c.setLineDash([3,2]); c.lineWidth=1.1;
+    for(const [x,y] of outs){ const ch=pl.g[y][x]; if(ch!==';'&&ch!==',') continue; c.strokeStyle=ch===';'?'rgba(70,170,90,.55)':'rgba(80,140,220,.55)'; const X=PAD+x*CELL, Y=PAD+y*CELL;
+      for(const [dx2,dy2,x1,y1,x2,y2] of [[0,-1,0,0,1,0],[0,1,0,1,1,1],[-1,0,0,0,0,1],[1,0,1,0,1,1]]){ const n=pget(pl,x+dx2,y+dy2); if(n===ch) continue; c.beginPath(); c.moveTo(X+x1*CELL,Y+y1*CELL); c.lineTo(X+x2*CELL,Y+y2*CELL); c.stroke(); } }
+    c.restore(); if(B){ const a=B.cell(Math.max(1,Math.floor(B.L/2)-(Math.abs(Math.floor(B.L/2)-B.dl)<3?4:0)),2); c.fillStyle='rgba(25,55,90,.85)'; rr(c,PAD+a.x*CELL-22,PAD+a.y*CELL+3.5,60,9,4); c.fill(); txt(c,'🚶 TROTTOIR · gratuit',PAD+a.x*CELL+8,PAD+a.y*CELL+8,4.4,'#e3f1ff','800'); } }
+}
+{ const f=v9Decor; v9Decor=function(c,C,pl){ f(c,C,pl); try{ if(S) v99Decor(c,C,pl); }catch(e){ console.error('v99Decor',e); } }; }
+{ const f=v9DecorSig; v9DecorSig=function(){ let s=f(); try{ s+='|'+v99Sig(); }catch(e){} return s; }; }
+{ const f=bgKeyNow; bgKeyNow=function(){ let k=f(); try{ k+='|'+v99Sig()+'|'+JSON.stringify(S.plan.dx||[])+'|'+S.tabs.map(t=>t.off?1:0).join(''); }catch(e){} return k; }; }
+{ const f=planImage; planImage=function(pl,C,k){ try{ const s=JSON.stringify(pl.dx||[])+(pl.sw?pl.sw.side+pl.sw.dl:'')+'|'+v99Sig(); if(PPC.v99!==s){ PPC.key=''; PPC.v99=s; } }catch(e){} return f(pl,C,k); }; }
+/* ---------- éditeur ---------- */
+(function(){ const i=PCATS.findIndex(x=>x[0]==='sa'); PCATS.splice(i+1,0,['te','Terrasse']);
+  Object.assign(PITEM,{
+   tf:{n:'Sol terrasse',e:'🟩',cat:'te',cost:0,v99:1},
+   r2:{n:'Table ronde métal · 2 chaises rotin',e:'☀️',cat:'te',cost:150,table:2,v99:1},
+   k2:{n:'Table teck · 2 chaises teck',e:'☀️',cat:'te',cost:150,table:2,v99:1},
+   k4:{n:'Table teck · 4 chaises teck',e:'☀️',cat:'te',cost:250,table:4,v99:1},
+   md:{n:'Mange-debout · 2 tabourets',e:'☀️',cat:'te',cost:150,table:2,v99:1},
+   tj:{n:'Jardinière',e:'🌿',cat:'te',cost:40,v99:1},
+   tb:{n:'Bac à plantes',e:'🪴',cat:'te',cost:40,v99:1},
+   th:{n:'Chauffage de terrasse',e:'🔥',cat:'te',cost:90,v99:1},
+   tp:{n:'Parasol',e:'⛱️',cat:'te',cost:90,v99:1} });
+  Object.assign(WORK_U,{r2:.2,k2:.2,k4:.25,md:.2,';':.05});
+})();
+const V99IC={};
+function v99Icon(k){ if(V99IC[k]) return V99IC[k]; try{ const cv=document.createElement('canvas'); cv.width=cv.height=44; const c=cv.getContext('2d'); c.scale(44/CELL/1.6,44/CELL/1.6); c.translate(CELL*.8,CELL*.8); const D=V99D;
+  if(k==='r2'){ D.chairRattan(c,-9,0,-Math.PI/2); D.chairRattan(c,9,0,Math.PI/2); D.roundT(c,0,0,5.5); }
+  else if(k==='k2'){ D.chairTeak(c,-9,0,-Math.PI/2); D.chairTeak(c,9,0,Math.PI/2); D.teakT(c,0,0,10,10); }
+  else if(k==='k4'){ D.chairTeak(c,-5,-9,0); D.chairTeak(c,5,-9,0); D.chairTeak(c,-5,9,Math.PI); D.chairTeak(c,5,9,Math.PI); D.teakT(c,0,0,20,12); }
+  else if(k==='md'){ D.stool(c,0,-8.5); D.stool(c,0,8.5); D.highT(c,0,0); }
+  else if(k==='tj'){ D.planter(c,0,0,22,7); } else if(k==='tb'){ c.scale(1.6,1.6); D.bac(c,0,0); } else if(k==='th'){ c.scale(1.5,1.5); D.heater(c,0,0,true); } else if(k==='tp'){ D.parasol(c,0,0,true,11); }
+  else if(k==='tf'){ for(let y=-1;y<1;y++) for(let x=-1;x<1;x++) v99Pavers(c,x*CELL-PAD,y*CELL-PAD,x+3,y+3,false); }
+  return (V99IC[k]=cv.toDataURL()); }catch(e){ return ''; } }
+{ const f=itemIcon; itemIcon=function(k){ if(PITEM[k]&&PITEM[k].v99) return v99Icon(k); return f(k); }; }
+function v99Warn(first,m){ if(first) toast(m,'bad'); }
+const V99MSG={salle:'✖ Mobilier de terrasse : uniquement sur la terrasse ou le trottoir (pas en salle).', ext:'✖ Mobilier de salle : uniquement à l’intérieur (pas en terrasse ni sur le trottoir).', sw:'Le trottoir est fixe (gratuit) : on n’y pose que du mobilier de terrasse.'};
+function v99Foot(pl,x,y,tool,o){ const d=tdim({t:tool,o}); const x0=o?x:x-Math.floor((d.w-1)/2), y0=o?y-Math.floor((d.h-1)/2):y; const cells=[]; for(let yy=y0;yy<y0+d.h;yy++) for(let xx=x0;xx<x0+d.w;xx++) cells.push([xx,yy]); return {x0,y0,cells}; }
+function v99PlaceTab(pl,x,y,tool,first){ if(!first) return false; const B=v99Band(pl); let o=ED.rot?1:0; const q=B&&B.lk(x,y); if(q) o=B.hor?0:1;
+  const F=v99Foot(pl,x,y,tool,o); let inside=false, busy=false;
+  for(const [xx,yy] of F.cells){ const ch=pget(pl,xx,yy); if(ch==null||!v99Out(ch)){ if(ch==='.'||ch==null||!v99InBand(pl,xx,yy)) inside=true; else busy=true; } else if(tableAtCell(pl,xx,yy)) busy=true; }
+  if(inside){ v99Warn(first,V99MSG.salle); return false; }
+  if(busy){ v99Warn(first,'Pas la place ici pour cette table (cases libres nécessaires).'); return false; }
+  const o2={t:tool,x:F.x0,y:F.y0,o}; const r=v99SwRule(pl,o2); if(r){ v99Warn(first,r); return false; }
+  pl.it.push(o2); return true; }
+function v99PlaceDx(pl,x,y,tool,first){ if(!first) return false; const ch=pget(pl,x,y); const B=v99Band(pl), q=B&&B.lk(x,y);
+  if(!(v99Out(ch)||q)){ v99Warn(first,V99MSG.salle); return false; }
+  if(ch==='E'){ v99Warn(first,'Laissez l’entrée libre.'); return false; }
+  const dx=pl.dx=pl.dx||[]; if(dx.some(d=>d.x===x&&d.y===y&&d.t===tool)) return false;
+  if(tool!=='tp'){ if(tableAtCell(pl,x,y)){ v99Warn(first,'Pas sur une table.'); return false; } if(dx.some(d=>d.x===x&&d.y===y&&d.t!=='tp')){ v99Warn(first,'Case déjà occupée.'); return false; }
+    if(q&&q.k===0){ v99Warn(first,'Laissez libre l’allée contre la façade.'); return false; } if(q&&q.k===1&&Math.abs(q.l-B.dl)<=1){ v99Warn(first,'Laissez libre le passage devant la porte.'); return false; }
+    if(q&&(q.l===0||q.l===B.L-1)&&q.k<2&&ch!=='W'){ return false; } }
+  dx.push({t:tool,x,y}); return true; }
+function v99PaintTer(pl,x,y,first){ const ch=pget(pl,x,y); if(ch===';') return false;
+  if(ch!=='.'||v99InBand(pl,x,y)){ v99Warn(first,'Le sol terrasse se peint sur une case de sol libre, le long de la façade.'); return false; }
+  if(tableAtCell(pl,x,y)){ v99Warn(first,'Retirez d’abord la table de salle.'); return false; }
+  const C=compilePlan(pl), i=y*pl.W+x; if(C.kit&&C.comp[i]>=0&&C.kit.has(C.comp[i])){ v99Warn(first,'Pas de terrasse dans la cuisine.'); return false; }
+  let ok=false; for(const [a,b] of [[x+1,y],[x-1,y],[x,y+1],[x,y-1]]){ const n=pget(pl,a,b); if(n===';'||n===','||(n==='W'||n==='E')&&(v99Edge(pl,a,b).b||v99Edge(pl,a,b).rail||isBorder(pl,a,b))) ok=true; }
+  if(!ok){ v99Warn(first,'Le sol terrasse part de la façade : peignez à partir d’un mur extérieur, du trottoir ou d’une case terrasse.'); return false; }
+  pset(pl,x,y,';'); return true; }
+function v99CleanDx(pl){ if(!pl.dx) return; pl.dx=pl.dx.filter(d=>{ const ch=pget(pl,d.x,d.y); return ch!=null&&(v99Out(ch)||v99InBand(pl,d.x,d.y))&&ch!=='E'; }); }
+{ const f=edApply; edApply=function(x,y,tool,first){ const pl=ED.plan; if(!pl||x<0||y<0||x>=pl.W||y>=pl.H) return f(x,y,tool,first);
+    let did=null; const ch=pget(pl,x,y), B=v99Band(pl), q=B&&B.lk(x,y);
+    if(V99.TT[tool]) did=v99PlaceTab(pl,x,y,tool,first);
+    else if(V99.DX[tool]) did=v99PlaceDx(pl,x,y,tool,first);
+    else if(tool==='tf') did=v99PaintTer(pl,x,y,first);
+    else if(tool==='erase'){ const t=tableAtCell(pl,x,y); if(!t){ const k=(pl.dx||[]).map(d=>d.x===x&&d.y===y).lastIndexOf(true); if(k>=0){ pl.dx.splice(k,1); did=true; } else if(q){ v99Warn(first,'Le trottoir est fixe (gratuit) : il ne s’efface pas.'); return false; } } if(did==null){ const r=f(x,y,tool,first); if(r) v99CleanDx(pl); return r; } }
+    else if(tool==='rot'){ const t=tableAtCell(pl,x,y); if(t&&V99.TT[t.t]){ if(!first) return false; const o={t:t.t,x:t.x,y:t.y,o:t.o?0:1}; const d=tdim(o); let ok=true; for(let yy=o.y;yy<o.y+d.h;yy++) for(let xx=o.x;xx<o.x+d.w;xx++){ const c2=pget(pl,xx,yy), k2=tableAtCell(pl,xx,yy); if(!c2||!v99Out(c2)||(k2&&k2!==t)) ok=false; }
+        const r=ok?v99SwRule(pl,o):''; if(ok&&!r){ t.o=o.o; did=true; } else { v99Warn(first,r||'Pas la place pour pivoter cette table.'); return false; } } else return f(x,y,tool,first); }
+    else if(q){ if(tool==='E'&&q.k===2) return f(x,y,tool,first); v99Warn(first,(tool==='2'||tool==='4')?V99MSG.ext:V99MSG.sw); return false; }
+    else if(tool==='2'||tool==='4'){ const F=v99Foot(pl,x,y,tool,ED.rot?1:0); if(F.cells.some(([a,b])=>{ const c2=pget(pl,a,b); return c2&&(v99Out(c2)||v99InBand(pl,a,b)); })){ v99Warn(first,V99MSG.ext); return false; } return f(x,y,tool,first); }
+    else if(ch===';'&&tool!=='W'&&tool!=='D'){ v99Warn(first,V99MSG.ext); return false; }
+    else { const r=f(x,y,tool,first); if(r) v99CleanDx(pl); return r; }
+    if(did){ pl.ver++; ED.dirty=true; } return !!did; }; }
+{ const f=planDiff; planDiff=function(a,b){ const r=f(a,b); try{ const k=p=>(p.dx||[]).map(d=>d.t+'@'+d.x+','+d.y).sort().join('|'); if(k(a)!==k(b)){ r.changes+=1; if(!r.days) r.days=1; } }catch(e){} return r; }; }
+{ const f=edRender; edRender=function(){ try{ if(ED.open&&ED.mode==='trav'&&ED.plan&&!ED.plan.sw&&ED.base&&ED.base.sw){ const hor=ED.base.sw.side==='top'||ED.base.sw.side==='bottom'; if(ED.plan.W===(hor?ED.base.W:ED.base.W-3)&&ED.plan.H===(hor?ED.base.H-3:ED.base.H)){ const np=v99AddSw(ED.plan); if(np!==ED.plan){ np.ver=(ED.plan.ver||1)+1; ED.plan=np; ED.fresh=''; } } } }catch(e){ console.error(e); }
+    const r=f.apply(this,arguments);
+    try{ if(ED.open&&ED.plan){ const C=compilePlan(ED.plan); const ts=C.tabs.filter(t=>t.z==='ter'); if(ts.length||ED.cat==='te'){ const sm=document.querySelector('#j0 .edh small'); const sal=C.seats-ts.reduce((a,t)=>a+t.cap,0), ter=ts.reduce((a,t)=>a+t.cap,0);
+        if(sm) sm.innerHTML=sm.innerHTML.replace(/ · \d+ places · /,' · 🍽️ salle '+sal+' places · ☀️ terrasse '+ter+' places · '); }
+      if(ED.cat==='te'){ const pal=document.querySelector('#j0 .edpal'); if(pal&&!pal.querySelector('.v99hint')){ const d=document.createElement('div'); d.className='v99hint'; d.textContent='☀️ Terrasse et trottoir uniquement · parasols ouverts seuls par beau temps · 1 chauffage = 4 tables par temps frais'; pal.appendChild(d); } } } }catch(e){}
+    return r; }; }
+
+/* ===== v9.9 part c ===== */
+/* =====================================================================
+   v9.9 « TERRASSE » — C) météo du jour, ouverture des tables, placement, satisfaction, équipe
+   ===================================================================== */
+/* état de la terrasse pour un jour (figé pour la journée) */
+function v99DayOf(d,pl){ pl=pl||S.plan; const w=weatherOf(d)||{k:'cloud',t:15}; const C=compilePlan(pl);
+  const ter=[]; C.tabs.forEach((t,i)=>{ if(t.z==='ter') ter.push(i); });
+  const dx=pl.dx||[], heaters=dx.filter(x=>x.t==='th'), paras=dx.filter(x=>x.t==='tp');
+  let mode; if(w.k==='rain') mode='rain'; else if(w.t<5) mode='cold'; else if(w.t<12) mode=heaters.length?'heat':'cold'; else mode='open';
+  const open=new Set();
+  if(mode==='open') ter.forEach(i=>open.add(i));
+  else if(mode==='heat'){ for(const h of heaters){ const hx=h.x+.5, hy=h.y+.5; const cand=ter.filter(i=>!open.has(i)).map(i=>{ const t=C.tabs[i]; return {i,d:Math.hypot(t.x+t.cw/2-hx,t.y+t.ch/2-hy)}; }).filter(o=>o.d<=7).sort((a,b)=>a.d-b.d||a.i-b.i).slice(0,4); for(const o of cand) open.add(o.i); } }
+  const seatsT=ter.reduce((a,i)=>a+C.tabs[i].cap,0), seatsO=[...open].reduce((a,i)=>a+C.tabs[i].cap,0);
+  return {d,w,mode,ter,open,seatsT,seatsO,seatsS:C.seats-seatsT,par:w.k!=='rain'&&(w.k==='sun'||w.t>=20),heatOn:heaters.length>0&&(mode==='heat'||(mode==='open'&&w.t<15)),sunBonus:w.k==='sun'&&w.t>=18,nTer:ter.length,nPar:paras.length,nHeat:heaters.length}; }
+function v99Day(){ const d=dayNum(), pl=S.plan; const key=d+'|'+(S.planKey||0)+'|'+(pl.ver||0)+'|'+JSON.stringify(pl.dx||[]).length+'|'+(V99.wxk||0);
+  if(V99.st&&V99.st.key===key&&V99.st.pl===pl) return V99.st; const st=v99DayOf(d,pl); st.key=key; st.pl=pl; V99.st=st; return st; }
+function v99Sig(){ if(!S||!S.plan) return ''; const st=v99Day(); return st.d+st.mode+(st.par?1:0)+(st.heatOn?1:0)+st.w.k+st.w.t+'|'+[...st.open].join(','); }
+function v99Zone(i){ try{ const t=compilePlan(S.plan).tabs[i]; return t&&t.z==='ter'?'ter':'sal'; }catch(e){ return 'sal'; } }
+function v99HasTer(){ try{ return compilePlan(S.plan).tabs.some(t=>t.z==='ter'); }catch(e){ return false; } }
+function v99OffI(i){ return !!(S&&S.tabs&&S.tabs[i]&&S.tabs[i].off); }
+/* synchronise S.tabs[i].off avec la météo du jour (tables de terrasse fermées) */
+function v99Sync(force){ if(!S||!S.plan||!S.tabs) return; const st=v99Day(); const C=compilePlan(S.plan); if(C.tabs.length!==S.tabs.length) return;
+  const key=st.key+'|'+st.w.k+st.w.t+'|'+S.tabs.length; if(!force&&V99.sk===key&&V99.sS===S) return; V99.sk=key; V99.sS=S; let ch=false;
+  for(let i=0;i<S.tabs.length;i++){ const t=S.tabs[i]; const off=C.tabs[i].z==='ter'&&!st.open.has(i);
+    if(off&&!t.off){ t.off=true; ch=true; if(t.hold!=null){ const r=(S.res||[]).find(x=>x.id===t.hold); if(r&&r.state==='booked'&&!S.tabs.some(u=>u.g!=null&&u.hold===r.id)){ for(const u of S.tabs) if(u.hold===r.id) u.hold=null; r.hold=null; } } }
+    else if(!off&&t.off){ delete t.off; ch=true; } }
+  if(ch){ try{ SC.bgKey=null; }catch(e){} } }
+{ const f=step; step=function(dt){ try{ if(S&&!(S.pw&&S.pw.j0)) v99Sync(); }catch(e){ console.error(e); } return f.apply(this,arguments); }; }
+{ const f=nextDay; nextDay=function(){ const r=f.apply(this,arguments); try{ if(S&&S.plan&&S.plan.sw){ const got=v99Convert(S); if(got.length) note('☀️ '+got.join(', ')+' : posés en mobilier sur le trottoir (modifiable dans l’éditeur).','good'); } v99Sync(true); }catch(e){ console.error(e); } return r; }; }
+{ const f=applyPlanToState; applyPlanToState=function(s,pl){ const r=f.apply(this,arguments); try{ if(s===S){ V99.st=null; v99Sync(true); } }catch(e){ console.error(e); } return r; }; }
+/* places : tables de terrasse fermées exclues */
+{ const f=totalSeats; totalSeats=function(){ return S.tabs.reduce((a,t)=>a+(t.off?0:t.cap),0); }; void f; }
+{ const f=maxPossibleCap; maxPossibleCap=function(){ if(!S.tabs.some(t=>t.off)) return f(); const n=S.tabs.length; const rows={}; for(let j=0;j<n;j++){ if(S.tabs[j].off) continue; const r=slotOf(j).r; rows[r]=(rows[r]||0)+S.tabs[j].cap; } return Math.max(0,...Object.values(rows)); }; }
+/* placement : client sans réservation → zone tirée au hasard selon les places libres ; réservation → sa zone */
+function v99FitZ(g,z){ let best=null; const sb=smallBlocked(g);
+  for(const c of clusterList()){ if(v99Zone(c.a)!==z) continue; if(!c.free||c.cap<g.size) continue; if(c.hold!=null&&c.hold!==g.res) continue; if(sb&&c.cap>=3) continue;
+    const score=(g.res&&c.hold===g.res?-100:0)+c.cap*10+c.a*0.1; if(!best||score<best.score) best={c,score}; }
+  return best&&best.c; }
+function v99FreeSeats(z){ let n=0; for(const c of clusterList()){ if(v99Zone(c.a)===z&&c.free&&c.hold==null) n+=c.cap; } return n; }
+{ const f=fitCluster; fitCluster=function(g){ let st; try{ st=v99Day(); }catch(e){ return f(g); } if(!st.nTer||!st.open.size) return f(g);
+    try{ if(g.res){ if(S.tabs.some(t=>t.hold===g.res)) return f(g); const r=(S.res||[]).find(x=>x.id===g.res); if(r&&r.zone){ const c=v99FitZ(g,r.zone==='ext'?'ter':'sal'); if(c) return c; } return f(g); }
+      const cs=v99FitZ(g,'sal'), ct=v99FitZ(g,'ter'); if(!cs||!ct) return f(g);
+      const fs=v99FreeSeats('sal'), ft=v99FreeSeats('ter'); const p=ft/Math.max(1,fs+ft); return rnd()<p?ct:cs; }catch(e){ console.error(e); return f(g); } }; }
+{ const f=seatGroup; seatGroup=function(g,c){ const r=f.apply(this,arguments); try{ if(g&&c&&c.a!=null){ g.v99ter=v99Zone(c.a)==='ter'?1:0; if(g.v99ter&&S.day) S.day.v99t=(S.day.v99t||0)+1; if(S.tabs[c.a]&&S.tabs[c.a].off&&S.day) S.day.v99off=(S.day.v99off||0)+1; } }catch(e){} return r; }; }
+/* satisfaction : +5 % en terrasse au soleil (≥ 18 °C) */
+{ const f=judge; judge=function(g){ const r=f(g); try{ if(r&&g&&g.v99ter&&typeof r.stars==='number'&&v99Day().sunBonus){ r.stars=clamp(r.stars*1.05,1,5); r.v99sun=1; } }catch(e){ console.error(e); } return r; }; }
+/* équipe : affectation Salle / Terrasse / Les deux (pénalité de distance pour l'autre zone → renfort automatique si la zone est vide) */
+const V99POSTS={serv:1,csalle:1,resp:1,barman:1};
+function v99ZoneStaff(s){ return !!s&&(s.role==='waiter'||s.role==='bar'); }
+function v99ZP(s,t){ try{ const z=(s&&s.v99z)||'s'; if(z==='d'||!t||t.g==null) return 0; const st=v99Day(); if(!st.nTer||!st.open.size) return 0;
+    const g=G(t.g); const ti=g&&(g.table!=null?g.table:(g.rsv?g.rsv.a:null)); if(ti==null) return 0; const tz=v99Zone(ti); if((z==='t')===(tz==='ter')) return 0;
+    if(!V99.zc||V99.zc.t!==S.t||V99.zc.S!==S){ const zc={t:S.t,S,ter:0,sal:0}; for(const x of S.staff){ if(!v99ZoneStaff(x)) continue; let ok=false; try{ ok=avail(x); }catch(e){} if(!ok) continue; const q=x.v99z||'s'; if(q!=='s') zc.ter++; if(q!=='t') zc.sal++; } V99.zc=zc; }
+    return (tz==='ter'?V99.zc.ter:V99.zc.sal)>0?8:0; }catch(e){ return 0; } }
+/* correctif (bug antérieur v9.8.1) : un habitué programmé (ou un client « revenez plus tard ») arrivait pendant des travaux / une fermeture,
+   alors que le stock n'est pas réapprovisionné ces jours-là → rupture. Aucun client spontané n'entre quand le restaurant est fermé. */
+{ const f=newGroup; newGroup=function(o){ try{ o=o||{}; if(!o.force&&!o.res&&S&&S.pw&&((typeof worksNow==='function'&&worksNow())||(typeof closedNow==='function'&&closedNow()))) return null; }catch(e){} return f.apply(this,arguments); }; }
+
+/* ===== v9.9 part d ===== */
+/* =====================================================================
+   v9.9 « TERRASSE » — D) réservations : choix intérieur / extérieur, redirections, carnet à deux colonnes
+   ===================================================================== */
+function v99ChoiceOn(){ try{ const st=v99Day(); return st.nTer>0&&st.nPar>0; }catch(e){ return false; } }
+/* météo/terrasse d'un jour donné (jour 1-based) : aujourd'hui = v99Day(), sinon calcul mis en cache */
+function v99DayFor(d){ const d0=dayNum(); if(d==null||d===d0) return v99Day(); const pl=S.plan; const key=d+'|'+(S.planKey||0)+'|'+(pl.ver||0)+'|'+JSON.stringify(pl.dx||[]).length+'|'+(V99.wxk||0);
+  V99.dc=V99.dc||{}; const c=V99.dc[d]; if(c&&c.key===key&&c.pl===pl) return c; const st=v99DayOf(d,pl); st.key=key; st.pl=pl; V99.dc[d]=st; return st; }
+function v99Svc(t){ return ((t%1440)+1440)%1440<1000?'midi':'soir'; }
+/* capacité max d'une rangée assemblable dans une zone (tables ouvertes) */
+function v99RowCap(z){ const n=S.tabs.length, rows={}; for(let j=0;j<n;j++){ if(S.tabs[j].off||v99Zone(j)!==z) continue; const r=slotOf(j).r; rows[r]=(rows[r]||0)+S.tabs[j].cap; } return Math.max(0,...Object.values(rows)); }
+/* places restantes d'une zone pour un service (places ouvertes − couverts réservés) */
+function v99Left(z,svc,day){ const st=v99DayFor(day==null?null:day+1); const cap=z==='ext'?st.seatsO:st.seatsS; const used=(S.res||[]).filter(r=>(r.state==='booked'||r.state==='arrived'||r.state==='seated')&&(r.zone||'int')===z&&v99Svc(r.t)===svc&&(day==null||Math.floor(r.t/1440)===day)).reduce((a,r)=>a+r.size,0); return {cap,left:Math.max(0,cap-used)}; }
+/* la terrasse peut-elle accueillir cette demande ? '' = oui, sinon raison */
+function v99ExtWhy(q){ const st=v99DayFor(Math.floor(q.t/1440)+1); if(!st.open.size) return st.mode==='rain'?'rain':'cold';
+  const near=(S.res||[]).filter(r=>r.state==='booked'&&r.zone==='ext'&&Math.abs(r.t-q.t)<=45).reduce((a,r)=>a+r.size,0);
+  if(near+q.size>st.seatsO*0.8||q.size>v99RowCap('ter')) return 'full'; return ''; }
+const V99WHY={rain:'pluie : terrasse fermée',cold:'froid : terrasse fermée',full:'terrasse complète'};
+{ const f=genResReqs; genResReqs=function(n){ const before=new Set((S.resReq||[]).map(q=>q.id)); const r=f.apply(this,arguments);
+    try{ const on=v99ChoiceOn(); const st=on?v99Day():null; for(const q of S.resReq||[]){ if(before.has(q.id)||q.zone) continue;
+        if(!on){ q.zone='int'; continue; } const share=st.seatsT/Math.max(1,st.seatsT+st.seatsS); const p=clamp(share*1.2,0.2,0.6)*(st.mode==='open'?1:st.mode==='heat'?0.6:0.35); q.zone=rnd()<p?'ext':'int'; } }catch(e){ console.error(e); }
+    return r; }; }
+{ const f=A_resAccept; A_resAccept=function(id){ const q=(S.resReq||[]).find(x=>x.id===id); let want=(q&&q.zone)||'int', zone=want, moved='';
+    try{ if(q&&want==='ext'){ if(!v99HasTer()) zone='int'; else { moved=v99ExtWhy(q); if(moved) zone='int'; } } }catch(e){ console.error(e); }
+    const r=f.apply(this,arguments);
+    try{ if(r&&r.ok){ const res=S.res.find(x=>x.id===id); if(res){ res.zone=zone; res.want=want; if(moved) res.moved=moved; } if(moved){ r.msg+=' ↪️ Souhait « terrasse » : '+V99WHY[moved]+', placée à l’intérieur.'; r.v99moved={why:moved,name:q.name,size:q.size,t:q.t}; } } }catch(e){ console.error(e); }
+    return r; }; }
+ACT.resAccept=function(p){ const r=A_resAccept(+p); result(r,'ding'); try{ if(r&&r.ok&&r.v99moved){ const m=r.v99moved, st=v99DayFor(Math.floor(m.t/1440)+1), L=v99Left('int',v99Svc(m.t),Math.floor(m.t/1440));
+    showPopup({now:true,icon:'📅',title:'Réservation acceptée',body:'<p><b>'+m.name+' · '+m.size+' pers.</b> · '+dowName(Math.floor(m.t/1440)+1)+' '+hhmm(m.t%1440)+'</p><div class="chips"><span class="chip warn">☀️ Demandé : extérieur</span><span class="chip bad">'+(m.why==='full'?'Terrasse complète ('+st.seatsO+' places)':m.why==='rain'?'🌧️ Pluie : terrasse fermée':'🥶 Froid : terrasse fermée')+'</span></div><p>↪️ Réservation enregistrée <b>à l’intérieur</b> automatiquement : '+L.left+' places libres en salle au '+(v99Svc(m.t)==='midi'?'déjeuner':'dîner')+'.</p><p class="muted">Elle apparaît dans la colonne « Intérieur » du carnet avec le repère ☀️↪️. Sans effet sur la satisfaction.</p>',choices:[{label:'OK',cb(){}}]}); } }catch(e){ console.error(e); } };
+/* tenue de table 20 min avant : dans la zone de la réservation, repli en salle pour l'extérieur */
+function v99ResHold(r){ const ter=v99HasTer(); const winOK=r.size>=3||autoAssembleOK({size:r.size});
+  const one=z=>{ let c=null; for(const x of clusterList()){ if(!x.free||x.hold!=null||x.cap<r.size) continue; if(z&&v99Zone(x.a)!==z) continue; if(!c||x.cap<c.cap) c=x; } if(!c&&winOK){ V99.wz=z; let w=null; try{ w=findWindow(r.size,r.id,null); }finally{ V99.wz=null; } if(w){ r.autoJ=joinWindow(w); c=clusterOf(w.a); } } return c; };
+  if(!ter) return one(null);
+  if(r.zone==='ext'){ let c=one('ter'); if(c) return c; c=one('sal'); if(c&&!r.moved){ const st=v99Day(); r.moved=st.open.size?'full':(st.mode==='rain'?'rain':'cold'); r.zone='int'; } return c; }
+  return one('sal'); }
+/* carnet à deux colonnes */
+function v99ResTable(rows){ if(!rows.length) return '<p class="muted" style="margin:4px 0">Aucune réservation.</p>';
+  let h='<table class="v99t"><tr><th>Heure</th><th>Client</th><th>Couv.</th><th>Table</th><th>État</th></tr>'; let last='';
+  for(const r of rows){ const sv=v99Svc(r.t); if(sv!==last){ last=sv; h+='<tr class="svc"><td colspan="5">'+(sv==='midi'?'Déjeuner':'Dîner')+'</td></tr>'; }
+    const st=RSL[r.state]||['','']; let tb='—'; const g=r.gid!=null?G(r.gid):null;
+    if(g&&g.table!=null) tb=v99TabN(g.table); else if(r.hold) tb=v99TabN(r.hold[0])+(r.hold[1]>r.hold[0]?'–'+v99TabN(r.hold[1]):'');
+    h+='<tr><td class="n">'+hhmm(r.t%1440)+'</td><td>'+r.name+(r.moved&&r.want==='ext'?' ☀️↪️':'')+(r.diet?' '+DIETS[r.diet].e:'')+(r.lateBy&&r.state==='booked'?' ⏰':'')+'</td><td>'+r.size+'</td><td>'+tb+'</td><td><span class="chip '+st[1]+'" style="font-size:10.5px;padding:1px 6px">'+st[0]+'</span></td></tr>'; }
+  return h+'</table>'; }
+function v99Board(){ const st=v99Day(), d0=dayNum(); const days=[...new Set((S.res||[]).map(r=>Math.floor(r.t/1440)+1))].filter(d=>d>d0).sort((a,b)=>a-b); days.unshift(d0);
+  if(ui.v99rd==null||days.indexOf(ui.v99rd)<0) ui.v99rd=d0; const dd=ui.v99rd; const sd=v99DayFor(dd); const w=sd.w||weatherOf(dd);
+  const sel=days.length>1?'<div class="tabs3" style="margin:0">'+days.map(d=>{ const x=weatherOf(d); return '<button class="'+(d===dd?'on':'')+'" data-a="v99rd" data-p="'+d+'">'+(d===d0?'Aujourd’hui':dowName(d))+' '+x.e+'</button>'; }).join('')+'</div>':'<span class="chip">'+w.e+' Aujourd’hui · '+w.t+' °C</span>';
+  const list=(S.res||[]).filter(r=>Math.floor(r.t/1440)+1===dd).sort((a,b)=>a.t-b.t);
+  const I=list.filter(r=>(r.zone||'int')!=='ext'), E=list.filter(r=>r.zone==='ext'), M=list.filter(r=>r.moved&&r.want==='ext');
+  const chipL=(z,svc)=>{ const L=v99Left(z,svc,dd-1); if(z==='ext'&&!L.cap) return '<span class="chip bad">'+(svc==='midi'?'Midi':'Soir')+' : fermée</span>'; return '<span class="chip '+(L.left>0?'ok':'bad')+'">'+(svc==='midi'?'Midi':'Soir')+' : '+L.left+' / '+L.cap+' places libres</span>'; };
+  let al=''; const tdeg=w.t+' °C';
+  { const st=sd, jour=dd!==d0?' '+dowName(dd).toLowerCase():''; if(st.mode==='rain') al='<div class="v99al">🌧️ <b>Alerte météo'+jour+' : pluie, '+tdeg+'.</b> Terrasse fermée'+(M.length?' : les <b>'+M.length+' réservation(s) extérieure(s) ('+M.reduce((a,r)=>a+r.size,0)+' couverts)</b> sont placées <b>à l’intérieur</b> automatiquement.':' : toutes les réservations sont placées à l’intérieur.')+'</div>';
+    else if(st.mode==='cold') al='<div class="v99al cold">🥶 <b>Froid'+jour+' : '+tdeg+'.</b> Terrasse fermée'+(st.nHeat?' (en dessous de 5 °C, même avec chauffages).':' : sans chauffage, elle ferme en dessous de 12 °C.')+'</div>';
+    else if(st.mode==='heat') al='<div class="v99al cold">🔥 <b>Temps frais'+jour+' : '+tdeg+'.</b> Seules les tables proches des chauffages sont ouvertes ('+st.open.size+' / '+st.nTer+' tables · 1 chauffage = 4 tables).</div>';
+    else al='<div class="v99al" style="background:#eef7ea;border-color:#c5e2bd;color:#24502a">'+w.e+' <b>'+(w.k==='sun'?'Beau temps':'Temps sec')+jour+' : '+tdeg+'.</b> Terrasse ouverte'+(st.par&&st.nPar?' · parasols ouverts':'')+(st.sunBonus?' · bonus satisfaction +5 % en terrasse':'')+'.</div>'; }
+  const mv=M.length?'<p class="muted" style="margin:6px 0 2px;font-size:11.5px"><b>↪️ Placées à l’intérieur :</b> '+M.map(r=>r.name+' ('+r.size+', '+hhmm(r.t%1440)+', '+(V99WHY[r.moved]||'')+')').join(' · ')+'</p>':'';
+  return '<section class="card v99wide"><div class="v99h"><h3 style="margin:0">📒 Carnet · intérieur / extérieur</h3>'+sel+'</div>'+
+    '<div class="v99g"><div class="v99col"><div class="v99h"><b>🍽️ Intérieur</b><span class="v99ch">'+chipL('int','midi')+chipL('int','soir')+'</span></div>'+v99ResTable(I)+'</div>'+
+    '<div class="v99col ext"><div class="v99h"><b>☀️ Extérieur</b><span class="v99ch">'+chipL('ext','midi')+chipL('ext','soir')+'</span></div>'+al+v99ResTable(E)+mv+'</div></div>'+
+    '<p class="muted" style="margin:6px 0 0;font-size:11.5px">La table est attribuée 20 min avant l’arrivée (« — » jusque-là). ☀️↪️ = demandé dehors, placé dedans (sans effet sur la satisfaction). Places restantes = places ouvertes de la zone moins les couverts réservés du service.</p></section>'; }
+function v99ReqCards(){ let h=''; const on=v99ChoiceOn();
+  for(const q of S.resReq){ const left=Math.max(0,Math.round(q.exp-S.t)); const ok=q.size<=maxPossibleCap(); let chips='';
+    if(on||q.zone==='ext'){ const ext=q.zone==='ext'; const why=ext?v99ExtWhy(q):''; const L=v99Left(ext?'ext':'int',v99Svc(q.t),Math.floor(q.t/1440));
+      chips='<div class="chips"><span class="chip '+(ext?'warn':'')+'">'+(ext?'☀️ Souhaite : <b>extérieur</b>':'🍽️ Souhaite : <b>intérieur</b>')+'</span><span class="chip '+(why?'bad':'ok')+'">'+(why?'↪️ '+(why==='full'?'Terrasse complète':why==='rain'?'Pluie':'Froid')+' → sera placé à l’intérieur':(ext?'Terrasse':'Intérieur')+' : '+L.left+' places libres au '+(v99Svc(q.t)==='midi'?'déjeuner':'dîner'))+'</span></div>'; }
+    h+=card('','<div class="row"><span class="em">📅</span><div class="grow"><b>'+q.name+' · '+q.size+' pers.</b><small>'+dowName(Math.floor(q.t/1440)+1)+' '+hhmm(q.t%1440)+(q.diet?' · '+DIETS[q.diet].e+' '+DIETS[q.diet].n.toLowerCase():'')+' · répondre dans '+Math.floor(left/60)+'h'+String(left%60).padStart(2,'0')+'</small>'+(ok?'':'<small class="bad">Trop grand : assemblez des tables.</small>')+'</div></div>'+chips+'<div class="btnrow">'+btn('✔ Accepter','resAccept',q.id,null,'primary',!ok)+btn('✖ Décliner','resDecline',q.id,null,'ghost')+'</div>'); }
+  return h; }
+{ const f=VIEWS.res; VIEWS.res=function(){ const o=f.apply(this,arguments); try{ if(!v99HasTer()) return o;
+      const i=o.indexOf('<h4 class="sec">Demandes'), j=o.indexOf('<h4 class="sec">Carnet'), k=o.indexOf('<h4 class="sec">⭐'); if(i<0||j<i||k<j) return o;
+      const st=v99Day(); const intro=card('','<p class="muted" style="margin:0">☀️ <b>Terrasse</b> : '+st.nTer+' table(s) · '+st.seatsT+' places'+(st.nPar?' · '+st.nPar+' parasol(s)':' · <b>aucun parasol</b> (les clients ne peuvent pas choisir la terrasse)')+(st.nHeat?' · '+st.nHeat+' chauffage(s)':'')+'. '+(v99ChoiceOn()?'Chaque demande indique si le client veut manger <b>à l’intérieur</b> ou <b>en terrasse</b> ; si la terrasse est complète ou fermée, il est <b>placé à l’intérieur</b> automatiquement.':'')+'</p>');
+      const hd='<h4 class="sec">Demandes en attente'+(S.resReq.length?' ('+S.resReq.length+')':'')+'</h4>';
+      const req=S.resReq.length?v99ReqCards():card('','<p class="muted">Aucune demande pour le moment'+(dayNum()<2?' (elles arrivent à partir du jour 2).':'.')+'</p>');
+      return o.slice(0,i)+intro+hd+req+'<h4 class="sec">Carnet de réservations</h4>'+v99Board()+o.slice(k); }catch(e){ console.error('v99 résas',e); return o; } }; }
+ACT.v99rd=function(p){ ui.v99rd=+p; ui.last=''; renderTab(true); };
+
+/* ===== v9.9 part e ===== */
+/* =====================================================================
+   v9.9 « TERRASSE » — E) Équipe : sélecteur Salle / Terrasse / Les deux, styles, bandeau du plan
+   ===================================================================== */
+(function(){ const css='.v99wide{column-span:all}.v99g{display:grid;grid-template-columns:1fr 1fr;gap:10px}.v99col{border:1px solid var(--line);border-radius:12px;padding:8px 9px;background:#fff;min-width:0}.v99col.ext{background:#fbf8ef}'
+ +'.v99h{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:6px}.v99h b{font-size:15px}.v99ch{display:inline-flex;gap:4px;flex-wrap:wrap}'
+ +'.v99t{width:100%;border-collapse:collapse;font-size:12.5px}.v99t th{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--mute);text-align:left;padding:3px 4px;border-bottom:1px solid var(--line)}.v99t td{padding:5px 4px;border-bottom:1px solid var(--line);vertical-align:middle}.v99t tr:last-child td{border-bottom:0}.v99t td.n{font-weight:800}.v99t .svc td{background:#f6f2ea;font-size:10.5px;font-weight:800;color:var(--mute);text-transform:uppercase;letter-spacing:.4px;padding:3px 4px}'
+ +'.v99al{background:#e7eef8;border:1px solid #b8cbe6;color:#22416b;border-radius:10px;padding:6px 8px;font-size:12px;margin:0 0 6px;line-height:1.3}.v99al.cold{background:#eef3f7}'
+ +'.v94row.v99r{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) auto auto}.v99z{display:flex;gap:3px;margin:0}.v99z button{flex:none;padding:5px 7px;border-radius:99px;background:#eee8dd;font-weight:700;font-size:11.5px;line-height:1.1;color:var(--ink)}.v99z button.on{background:var(--acc);color:#fff}.v99z.k{color:var(--mute);font-size:11px;padding:0 4px}'
+ +'.v99hint{flex:none;align-self:center;font-size:11px;color:var(--mute);max-width:230px;padding:0 6px;line-height:1.25;white-space:normal}'
+ +'@media (max-width:600px){.v99g{grid-template-columns:1fr}}';
+  try{ const st=document.createElement('style'); st.textContent=css; document.head.appendChild(st); }catch(e){} })();
+const V99ZL=[['s','🍽️ Salle'],['t','☀️ Terrasse'],['d','↔️ Les deux']];
+function v99ZoneSel(s){ const z=s.v99z||'s'; return '<div class="v99z">'+V99ZL.map(([k,l])=>'<button class="'+(z===k?'on':'')+'" data-a="v99zone" data-p="'+s.id+':'+k+'" aria-pressed="'+(z===k)+'">'+l+'</button>').join('')+'</div>'; }
+{ const f=VIEWS.team; VIEWS.team=function(){ let h=f.apply(this,arguments); try{ if(ui.v94emp!=null) return h; const ter=v99HasTer();
+      h=h.replace(/(<div class="v94row" data-a="v94emp" data-p="(\d+)"[^>]*>)([\s\S]*?)(<button class="btn primary sm" data-a="v94emp" data-p="\2">Fiche ›<\/button><\/div>)/g,(m,a,id,mid,b)=>{ const s=S.staff.find(x=>String(x.id)===id); const sel=s&&v99ZoneStaff(s)?v99ZoneSel(s):'<div class="v99z k"></div>'; return a.replace('class="v94row"','class="v94row v99r"')+mid+sel+b; });
+      if(ter||S.staff.some(s=>v99ZoneStaff(s)&&s.v99z&&s.v99z!=='s')){ const n={s:0,t:0,d:0}; S.staff.forEach(s=>{ if(v99ZoneStaff(s)) n[s.v99z||'s']++; }); const st=v99Day();
+        const box='<div class="v99al" style="background:#f6f2ea;border-color:var(--line);color:var(--ink)">☀️ <b>Salle / terrasse</b> — choisissez l’affectation de chaque employé de salle (serveurs, commis, maître d’hôtel, barman). <span class="v99ch" style="margin-top:4px"><span class="chip">🍽️ Salle '+n.s+'</span><span class="chip warn">☀️ Terrasse '+n.t+'</span><span class="chip ok">↔️ Les deux '+n.d+'</span>'+(ter?'<span class="chip '+(st.open.size?'ok':'bad')+'">Terrasse '+(st.open.size?'ouverte aujourd’hui':'fermée aujourd’hui → tout le monde en salle')+'</span>':'')+'</span><br><small style="color:var(--mute)">Terrasse fermée (pluie, froid) → l’équipe terrasse aide en salle. Zone en manque → renfort automatique de l’autre zone. Nouvelle recrue : Salle.</small></div>';
+        h=h.replace(/(Employés · touchez une ligne pour la fiche<\/h3>)/,'$1'+box); } }catch(e){ console.error('v99 équipe',e); } return h; }; }
+ACT.v99zone=function(p){ const [id,z]=String(p).split(':'); const s=S.staff.find(x=>String(x.id)===id); if(!s||!v99ZoneStaff(s)||['s','t','d'].indexOf(z)<0) return; s.v99z=z; V99.zc=null; ui.last=''; renderTab(true); try{ save(); }catch(e){} toast(s.name+' : '+(z==='s'?'en salle':z==='t'?'en terrasse':'salle et terrasse')+'.','good'); };
+/* numéros de table « E1 » dans les textes */
+{ const f=dayNum; void f; }
 
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
