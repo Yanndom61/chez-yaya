@@ -1529,7 +1529,7 @@ function serveDone(g,wid){
   const errs=g.items.filter(it=>it.err);
   const algBad=g.alg?g.items.filter(it=>it.k===0&&!it.err&&DISH[it.d].al.includes(g.alg)):[];
   if(errs.length||algBad.length){
-    const s=S.staff.find(x=>x.id===wid), aut=s?autOf(s):2; const catchP=wid==='P'?0.85:0.1*aut+0.05;
+    const s=S.staff.find(x=>x.id===wid), aut=s?autOf(s):2; const catchP=wid==='P'?0.85:v101Catch(s,aut);
     if(rnd()<catchP){
       for(const it of errs){ const idx=g.items.indexOf(it); const w=it.err.want;
         if(dishAvail(w)) g.items[idx]=takeDish(w,{k:it.k}); else g.items.splice(idx,1); }
@@ -9370,7 +9370,7 @@ function v98Pick(w,r){ const ks=Object.keys(w).filter(k=>w[k]>0); let tot=ks.red
 const V98MIJOTE={lasagne:1};
 function v98CuKind(id){ const d=DISH[id]; if(!d||d.cat!=='plat'||d.bar) return null; const r=d.rec||{};
  if(r.boeuf&&!V98MIJOTE[id]) return 'rouge'; if(r.boeuf||r.paleron||r.veau) return 'mijote'; if(r.volaille) return 'volaille'; if(r.jambon) return 'porc'; return null; }
-const v98CuOpts=k=>k==='rouge'?V98CU_ORDER:k==='rouge3'?['saignante','apoint','bien']:['apoint','bien'];
+const v98CuOpts=k=>v101Opts(k);
 const V98KIND={rouge:'viande rouge',mijote:'viande mijotée',volaille:'volaille',porc:'porc'};
 /* accompagnement : plats principaux de viande ou de poisson */
 function v98HasSide(id){ const d=DISH[id]; if(!d||d.cat!=='plat'||d.bar) return false; return !!v98CuKind(id)||!!(d.rec&&d.rec.poisson); }
@@ -9624,8 +9624,8 @@ function v98ItemTxt(it,full){ const p=[]; if(it.cu){ let c=v98CuLab(it.cu).toLow
 /* ticket cuisine */
 function v98TicketCard(){ const L=S.tickets.filter(tk=>!tk.bar&&G(tk.g)); if(!L.length&&!S.groups.some(g=>g.state==='cook')) return '';
  const rows=L.slice(0,8).map(tk=>{ const g=G(tk.g), it=g.items[tk.i]; if(!it||!DISH[it.d]) return ''; const d=DISH[it.d]; const s=tk.w&&tk.w!=='P'?S.staff.find(x=>x.id===tk.w):null; const pct=tk.n0?clamp(Math.round((1-tk.need/tk.n0)*100),0,100):0;
-  return '<div class="v98tk"><span class="em">'+d.e+'</span><div class="grow"><b>'+(g.table!=null?'Table '+v99TabN(g.table):'Comptoir')+' · '+d.n+'</b><div class="chips">'+(it.cu?'<span class="chip">'+V98CU[it.cu].e+' '+v98CuLab(it.cu)+'</span>':'')+(it.acc&&it.acc.length?it.acc.map(a=>'<span class="chip">'+V98SIDES[a].e+' '+V98SIDES[a].n+'</span>').join(''):'')+(it.sup?'<span class="chip ok">2ᵉ accompagnement +'+money2(it.sup)+'</span>':'')+(it.cuK&&it.cuK!=='rouge'?'<span class="chip warn">'+V98KIND[it.cuK]+' : à point ou bien cuite seulement</span>':'')+'</div><small>'+(s?'👨‍🍳 '+s.name:tk.w==='P'?'👤 vous':'⏳ en attente d’un cuisinier')+' · '+pct+' %</small><div class="v98pg"><i style="width:'+pct+'%"></i></div></div></div>'; }).join('');
- return card('🧾 Tickets cuisine ('+L.length+')',(rows||'<p class="muted">Aucun plat en préparation.</p>')+(L.length>8?'<small class="muted">… et '+(L.length-8)+' autre(s).</small>':'')+'<p class="muted" style="margin:6px 0 0">Le serveur note la <b>cuisson</b> des viandes et l’<b>accompagnement</b> à la commande ; la volaille et le porc ne se servent qu’à point ou bien cuits.</p>'); }
+  return '<div class="v98tk"><span class="em">'+d.e+'</span><div class="grow"><b>'+(g.table!=null?'Table '+v99TabN(g.table):'Comptoir')+' · '+d.n+'</b><div class="chips">'+(it.cu?'<span class="chip">'+V98CU[it.cu].e+' '+v98CuLab(it.cu)+'</span>':'')+(it.acc&&it.acc.length?it.acc.map(a=>'<span class="chip">'+V98SIDES[a].e+' '+V98SIDES[a].n+'</span>').join(''):'')+(it.sup?'<span class="chip ok">2ᵉ accompagnement +'+money2(it.sup)+'</span>':'')+(it.cuK?v101KindChip(it.cuK):'')+'</div><small>'+(s?'👨‍🍳 '+s.name:tk.w==='P'?'👤 vous':'⏳ en attente d’un cuisinier')+' · '+pct+' %</small><div class="v98pg"><i style="width:'+pct+'%"></i></div></div></div>'; }).join('');
+ return card('🧾 Tickets cuisine ('+L.length+')',(rows||'<p class="muted">Aucun plat en préparation.</p>')+(L.length>8?'<small class="muted">… et '+(L.length-8)+' autre(s).</small>':'')+'<p class="muted" style="margin:6px 0 0">Le serveur note la <b>cuisson</b> des viandes et l’<b>accompagnement</b> à la commande ; les cuissons proposées dépendent de la viande ; plats mijotés et poissons (hors thon et saumon) n’en ont pas.</p>'); }
 { const f=VIEWS.home; VIEWS.home=function(){ let h=f.apply(this,arguments); try{ const tc=v98TicketCard(); if(tc){ const m=h.match(/<section class="card ?[^"]*"><h3>📊 Indicateurs<\/h3>/); h=m?h.replace(m[0],tc+m[0]):h+tc; } }catch(e){ console.error(e); } return h; }; }
 /* ventes du jour / du mois */
 function v98DayAgg(d){ d=d||S.day; return {acc:Object.assign({},d.v98acc||{}),sup:d.v98sup||0,sup2:d.v98sup2||0,cu:Object.assign({},d.v98cu||{}),ok:d.v98ok||0,miss:d.v98miss||0,accMiss:d.v98accMiss||0}; }
@@ -10345,6 +10345,124 @@ function v10Migrate(s){ if(!s) return s; s.pw=s.pw||{}; v10Apply();
 /* chargement immédiat : appliquer le lieu de la partie courante */
 try{ if(typeof S!=='undefined'&&S) v10Apply(); else v10Apply(); }catch(e){ console.error(e); }
 window.V10={L:V10L,LOC:V10LOC,apply:v10Apply,migrate:v10Migrate,propose:v10Propose,specs:v10Specs,classics:v10Classics,win:v10Win,lc:v10Lc};
+
+/* ===== v10.1 w101a.js ===== */
+/* v10.1 a — cuissons : nouvelles classes par viande principale et mode de cuisson (grillé/poêlé/rôti vs mijoté).
+   Bœuf et viande hachée : bleu / saignant / à point / bien cuit · veau : rosé / à point / bien cuit · agneau : saignant / rosé / à point / bien cuit
+   canard : rosé / à point / bien cuit · porc et volaille : à point / bien cuit · thon et saumon : mi-cuit / cuit
+   autres poissons, plats mijotés, végétarien, cru, pané/frit, garni (sandwich, tourte, pâtes…) : aucun choix. */
+Object.assign(V98CU.bleue,{n:'Bleu'}); Object.assign(V98CU.saignante,{n:'Saignant'}); Object.assign(V98CU.bien,{n:'Bien cuit'});
+V98CU.rose={n:'Rosé',e:'🩷',f:0.97}; V98CU.micuit={n:'Mi-cuit',e:'🌗',f:0.9}; V98CU.cuit={n:'Cuit',e:'🟫',f:1};
+V98CU_ORDER.splice(0,V98CU_ORDER.length,'bleue','saignante','rose','apoint','bien','micuit','cuit');
+const V101OPTS={boeuf:['bleue','saignante','apoint','bien'],hache:['bleue','saignante','apoint','bien'],veau:['rose','apoint','bien'],agneau:['saignante','rose','apoint','bien'],canard:['rose','apoint','bien'],porc:['apoint','bien'],volaille:['apoint','bien'],thonsaumon:['micuit','cuit']};
+Object.assign(V98KIND,{boeuf:'bœuf',hache:'viande hachée',veau:'veau',agneau:'agneau',canard:'canard',porc:'porc',volaille:'volaille',thonsaumon:'thon ou saumon'});
+/* rang de cuisson (pour la cuisson la plus proche) */
+const V101RANK={bleue:0,saignante:1,micuit:1.5,rose:2,apoint:3,cuit:3.5,bien:4};
+function v101Opts(k){ return V101OPTS[k]||(k==='rouge'?V101OPTS.boeuf:k==='rouge3'?['saignante','apoint','bien']:['apoint','bien']); }
+function v101Near(cu,k){ const op=v101Opts(k); if(op.includes(cu)) return cu; const r=V101RANK[cu]!=null?V101RANK[cu]:3; let best=op[0],bd=1e9; for(const o of op){ const d=Math.abs(V101RANK[o]-r)+(V101RANK[o]<r?0.01:0); if(d<bd){ bd=d; best=o; } } return best; }
+/* ---- classement ---- */
+const V101RX={
+ raw:/tartare|carpaccio|sashimi|ceviche|gravlax|fumée?\b|sushi|poke|crudo|tiradito|yukhoe|maki|chirashi|tataki de bœuf cru|cru\b|crue\b/,
+ pane:/pané|panée|schnitzel|milanaise|cordon-bleu|katsu|karaage|\bfrit\b|\bfrite\b(?!s)|frits\b|friture|beignet|nuggets|tempura|croquette|fish|poisson-frites|tonkatsu|panure|chicharr|croustillant|viennoise/,
+ mij:/bourguignon|blanquette|daube|ragoût|ragout|mijot|braisé|braisée|braise|confit|navarin|tajine|tagine|curry|carbonn?ade|pot-au-feu|potée|cassoulet|choucroute|civet|goulash|stifado|colombo|rougail|massalé|\bcari\b|chili|bolognaise|lasagne|moussaka|hachis|parmentier|joue|osso|basquaise|fricassée|coq au vin|waterzooi|yassa|maf[ée]|feijoada|bigos|stroganoff|ropa vieja|mole\b|pozole|tinga|rendang|massaman|korma|vindaloo|soupe|bouillon|\bpho\b|ramen|udon|nouilles|pad |wok|sauté |sautés?\b|sautée|en sauce|à la crème|à la bière|au vin\b|au cidre|cocotte|gratin|tourte|tourtière|\bpie\b|pâté|quiche|croque|sandwich|burrito|taco|empanada|pizza|galette|crêpe|risotto|paella|couscous|biryani|pilaf|bibimbap|bol de riz|gyoza|ravioli|dumpling|pelmeni|\bbao\b|kebab|shawarma|döner|gyros|hot-dog|boudin|andouillette|merguez|saucisse|chorizo|salade|pastilla|wellington|feuilleté|marmite|cocido|fabada|caldo|sopa|stew|hotpot|farci|farcie|bouilli|vapeur|laqué|four kanak|bougna|tripes|axoa|gardiane|cuisse|à l’étouffée|étouffée|à la corète|okra|gombo|mafé|ragù|polenta|gnocchi|pâtes|spaghetti|tagliatelle|penne|macaroni|cannelloni|tortilla|omelette|œufs|oeufs|welsh|rillettes|terrine|kig ha farz|lentilles|haricots|stoemp|purée de légumes|hochepot|irish|poutine|pasty|bobotie|chakchouka|moambé|poulet yassa|massalé|kari|carry|achards|au curry|tandoori masala|tikka masala|butter chicken|matoke|ndolé|attiéké|thieboudienne|tiep|mechoui|méchoui|kleftiko|souris d’agneau|épaule confite|épaule|jarret|queue|tête|langue|rognons|ris de veau|pieds|gigot de sept heures|sept heures|lou?kanikopita|börek|kibbeh|kofta en sauce|boulettes|keftedes|meatballs|köttbullar|chou farci|dolma|sarma|golubtsy|hamburger steak|loco moco/,
+ /* pièces grillées / poêlées / rôties servies à la demande */
+ gr:/steak|quasi|entrecôte|bavette|faux-filet|côte de bœuf|côte de veau|côtes? d’agneau|côtelette|côte de porc|côte\b|filet|onglet|rumsteck|rumsteak|tournedos|picanha|asado|churrasco|tagliata|burger|brochette|grill|plancha|poêlé|poêlée|snacké|rôti|rôtie|magret|aiguillette|suprême|escalope|pavé|tataki|mi-cuit|souvlaki|chachlik|shashlik|kofta|kefta|yakitori|tandoori|tikka|bulgogi|galbi|kalbi|barbecue|bbq|braai|suya|jerk|piri|chop|t-bone|rib|gigot|carré|selle|noisette|médaillon|mignon|pluma|secreto|presa|lomo|bife|vacío|matambre|ćevapi|cevapi|pljeskavica|chateaubriand|parrillada|anticucho|satay|saté|sunday roast|rosbif|roast|piccata|saltimbocca|grenadine|cuisseau|côtes\b|travers|ribs|spare|lechón|cochon de lait|porchetta|teriyaki|shish|kebab grillé|kabab|nyama|tapa de|pincho|sosatie|à la broche|broche|grillade|grillé|grillée|grillés|grillées|au barbecue|sur le grill|à la plancha/,
+ hache:/burger|steak haché|haché|hachée|kofta|kefta|ćevapi|cevapi|pljeskavica|smash|hamburger|lula|seekh/,
+ boeuf:/bœuf|boeuf|steak|entrecôte|bavette|faux-filet|onglet|rumsteck|rumsteak|tournedos|picanha|asado|bife|vacío|matambre|wagyu|chateaubriand|bulgogi|galbi|kalbi|rosbif|sunday roast|t-bone|rib|tagliata|churrasco|aloyau|charolais|salers|aubrac|limousine|taureau|zébu|zebu|bison|cerf|chevreuil|biche|kangourou|autruche|gibier/,
+ veau:/veau|quasi|piccata|saltimbocca|grenadine|cuisseau/,
+ agneau:/agneau|gigot|mouton|cabri|chevreau|brebis|souvlaki d’agneau|chachlik|shashlik|lula/,
+ canard:/canard|magret|aiguillette de canard/,
+ porc:/porc|cochon|échine|travers|ribs|spare|lechón|porchetta|lomo|pluma|secreto|presa|jambon grillé|côte de porc|filet mignon|sanglier|tonkatsu/,
+ volaille:/poulet|\boie\b|volaille|chapon|dinde|pintade|caille|coquelet|suprême|yakitori|poularde|poule|pigeon|faisan|perdrix|blanc de/,
+ thonsaumon:/\bthon\b|saumon/
+};
+const V101FISH=/\bthon\b|saumon|sole|lieu|bar\b|dorade|daurade|merlu|cabillaud|morue|truite|sardine|maquereau|hareng|raie|brochet|sandre|loup|turbot|espadon|vivaneau|mérou|tilapia|poisson|crevette|homard|langouste|crabe|moules|huîtres|saint-jacques|calamar|poulpe|seiche|anguille|perche|églefin|haddock|carpe|silure|capitaine|thiof|mahi|marlin|bonite|rouget|colin|lotte|cod|scampi|gambas|lambi|ouassou|ecrevisse|écrevisse|bacalao|fruits de mer/;
+const V101MEATING={boeuf:'boeuf',paleron:'boeuf',veau:'veau',agneau:'agneau',canard:'canard',porc:'porc',jambon:'porc',saucisse:'porc',volaille:'volaille'};
+/* cas relus à la main (pièces rôties dont le nom ne dit pas le mode de cuisson) */
+const V101NAME={'canard rouennais':'canard','agneau de pauillac':'agneau','agneau de printemps & sauce menthe':'agneau','agneau de lait aux herbes':'agneau','bœuf haché & purée':'hache'};
+function v101Classify(id){ const d=DISH[id]; if(!d||d.cat!=='plat'||d.bar) return null; const rec=d.rec||{};
+ const n=String(d.n||'').toLowerCase().replace(/['’]/g,'’');
+ if(V101NAME[n]) return V101NAME[n]; const main=n.split(/,| – | - |\(|\bservi|\bavec\b/)[0];
+ const meatIng=Object.keys(rec).filter(i=>V101MEATING[i]); const fishIng=rec.poisson||rec.poissonl||rec.morue||rec.fdm;
+ if(!meatIng.length&&!fishIng) return null;                       /* végétarien */
+ if(V101RX.raw.test(main)||/foie gras/.test(main)) return null;                           /* cru */
+ if(V101RX.pane.test(main)) return null;                          /* pané / frit */
+ const grill=V101RX.gr.test(main)&&!/en sauce|au vin\b|confit|braisé|mijot/.test(main);
+ /* poisson : seuls thon et saumon grillés / poêlés / mi-cuits ont un choix */
+ if(V101RX.thonsaumon.test(main)) return grill&&!V101RX.mij.test(main.replace(/poêlée?|grillée?/g,''))?'thonsaumon':null;
+ if(!meatIng.length) return null;
+ if(!grill) return null;                                          /* mijoté, garni, sauce… */
+ if(V101RX.mij.test(main)&&!/^(steak|entrecôte|bavette|côte|côtelette|magret|filet|pavé|brochette|gigot|carré|suprême|escalope|burger|tournedos|onglet|rumsteck|faux-filet|t-bone|picanha)/.test(main)) return null;
+ /* viande principale : d'abord le nom, puis la recette */
+ if(V101RX.hache.test(main)) return 'hache';
+ for(const k of ['canard','agneau','veau','porc','boeuf','volaille']) if(V101RX[k].test(main)) return k;
+ if(rec.boeuf) return 'boeuf'; if(rec.agneau) return 'agneau'; if(rec.canard) return 'canard'; if(rec.veau) return 'veau'; if(rec.porc||rec.jambon||rec.saucisse) return 'porc'; if(rec.paleron) return 'boeuf'; if(rec.volaille) return 'volaille';
+ return null; }
+const V101KIND={}; function v101Kind(id){ if(!(id in V101KIND)) V101KIND[id]=v101Classify(id); return V101KIND[id]; }
+/* accompagnements : règles v9.8/v10 inchangées (calculées avec l'ancien type) */
+const V101OLDKIND=v98CuKind;
+v98HasSide=function(id){ const d=DISH[id]; if(d&&d.v10) return d.cat==='plat'&&!d.bar&&!!d.v10side; if(!d||d.cat!=='plat'||d.bar) return false; return !!V101OLDKIND(id)||!!(d.rec&&d.rec.poisson); };
+v98CuKind=function(id){ return v101Kind(id); };
+/* répartition des demandes par zone (habitudes locales) */
+v98CuDraw=function(id){ const k=v101Kind(id); if(!k) return null; const z=v98Zone(), r=v98Rand('cu'+id), w=V98RED[z]||V98RED.fr, W=V98WHITE[z]||V98WHITE.fr;
+ const T={boeuf:{bleue:w[0],saignante:w[1],apoint:w[2],bien:w[3]},hache:{bleue:w[0]*0.5,saignante:w[1]*0.8,apoint:w[2]*1.1,bien:w[3]*1.2},veau:{rose:w[0]+w[1],apoint:w[2],bien:w[3]},
+  agneau:{saignante:w[0]+w[1]*0.4,rose:w[1]*0.6+6,apoint:w[2],bien:w[3]},canard:{rose:w[0]+w[1]+5,apoint:w[2],bien:w[3]},porc:{apoint:W[0],bien:W[1]},volaille:{apoint:W[0],bien:W[1]},thonsaumon:{micuit:W[0],cuit:W[1]}};
+ return v98Pick(T[k],r); };
+
+/* ===== v10.1 w101b.js ===== */
+/* v10.1 b — erreurs ↔ compétences, plat renvoyé et refait.
+   E1 erreur de prise de commande (errRate) : baisse déjà avec le niveau, nulle dès le niveau 8.
+   E2 contrôle au passe (catchP) : la part des erreurs repérées monte avec le niveau, 100 % au niveau maximum.
+   E3 cuisson ratée (v98MissP) : baisse avec le niveau et la qualité, nulle au niveau maximum (aussi pour un employé non cuisinier qui dépanne en cuisine). */
+const v101Mastery=s=>s?clamp(((s.skill||0)-1)/9,0,1):0;
+function v101Catch(s,aut){ const b=0.1*aut+0.05, m=v101Mastery(s); return clamp(b+(1-b)*Math.pow(m,4),0,1); }
+let V101FORCE=0;
+v98MissP=function(w){ if(V101FORCE) return 0; let sk=3,lq=0; if(w&&w!=='P'){ const s=S.staff.find(x=>x.id===w); sk=s?(s.role==='cook'?s.skill:Math.min(2,s.skill)+(10-Math.min(2,s.skill))*Math.pow(v101Mastery(s),4)):3; lq=s&&s.lv?(s.lv.qual||0):0; } return clamp(0.16-0.018*sk-0.006*lq,0,0.15); };
+/* un plat refait est réussi (le chef le surveille) */
+{ const f=completeTicket; completeTicket=function(tk){ let fl=0; try{ const g=G(tk.g), it=g&&g.items[tk.i]; if(it&&it.cuRedo&&it.cuOk==null){ V101FORCE=1; fl=1; } }catch(e){ console.error(e); }
+  try{ return f.apply(this,arguments); } finally{ if(fl) V101FORCE=0; } }; }
+/* coût du plat refait : on puise dans le stock seulement au-delà d'une réserve (jamais de rupture), le reste vient de la réserve du chef au prix d'urgence */
+function v101RedoCost(id){ const d=DISH[id]; let c=0; if(!d||!d.rec) return 0;
+ for(const i in d.rec){ const n=d.rec[i], st=S.stock[i]; if(!st||!ING[i]) continue; const keep=Math.max(n*8,(st.par||0)*0.25); const take=Math.max(0,Math.min(n,(st.q||0)-keep));
+  if(take>0){ st.q-=take; c+=take*(st.cost||ING[i].p); } if(n-take>0) c+=(n-take)*ING[i].p*1.18; }
+ c=Math.round(c*100)/100; return isFinite(c)?c:0; }
+{ const f=serveDone; serveDone=function(g,wid){ try{ if(g&&G(g.id)){ const bad=g.items.filter(it=>it&&it.cu&&it.cuOk===false&&!it.cuRedo&&!it.err);
+   if(bad.length){ const low=s=>String(s).toLowerCase();
+    for(const it of bad){ const c=v101RedoCost(it.d); it.cuRedo={want:it.cu,got:it.cuGot,cost:c}; it.cost=(it.cost||0)+c; S.day.cogs+=c; S.day.v101redo=(S.day.v101redo||0)+1; S.day.v101redoCost=(S.day.v101redoCost||0)+c; S.tot.v101redo=(S.tot.v101redo||0)+1;
+     note('🔁 Table '+v99TabN(g.table)+' renvoie « '+DISH[it.d].n+' » : cuisson demandée « '+low(v98CuLab(it.cu))+' », servie « '+low(v98CuLab(it.cuGot))+' ». Plat refait en cuisine ('+money(c)+').','warn');
+     it.done=false; it.cuOk=null; delete it.cuGot; }
+    vfxAtGroup(g,'🔁','#b45309'); finalizeOrder(g); return; } } }catch(e){ console.error(e); } return f.apply(this,arguments); }; }
+/* satisfaction : le client a attendu un plat refait */
+function v101RedoN(g){ return ((g&&g.items)||[]).filter(it=>it&&it.cuRedo).length; }
+{ const f=judge; judge=function(g){ const r=f(g); try{ const n=v101RedoN(g); if(n){ const d=Math.min(0.6,0.3*n); r.stars=clamp(r.stars-d,1,5); r.v101={redo:n,d}; } }catch(e){ console.error(e); } return r; }; }
+{ const f=v98CuSentence; v98CuSentence=function(g){ try{ const it=((g&&g.items)||[]).find(x=>x&&x.cuRedo); if(it){ const low=s=>String(s).toLowerCase(); return ' Cuisson ratée ('+DISH[it.d].n+') : demandée « '+low(v98CuLab(it.cuRedo.want))+' », servie « '+low(v98CuLab(it.cuRedo.got))+' ». Plat renvoyé et refait, mais quelle attente.'; } }catch(e){ console.error(e); } return f.apply(this,arguments); }; }
+
+/* ===== v10.1 w101c.js ===== */
+/* v10.1 c — migration des sauvegardes, textes des cuissons, fiche employé (fiabilité) */
+function v101Migrate(S0){ S0=S0||S; S0.pw=S0.pw||{}; let n=0;
+ const fix=it=>{ if(!it||!it.d||!DISH[it.d]) return; if(it.cu==null&&it.cuK==null) return; const k=v101Kind(it.d);
+  if(!k){ delete it.cu; delete it.cuK; delete it.cuGot; delete it.cuOk; n++; return; }
+  if(it.cu&&!V101OPTS[k].includes(it.cu)){ it.cu=v101Near(it.cu,k); n++; } if(it.cuGot&&!V101OPTS[k].includes(it.cuGot)) it.cuGot=v101Near(it.cuGot,k);
+  if(it.cuRedo){ it.cuRedo.want=v101Near(it.cuRedo.want,k); it.cuRedo.got=v101Near(it.cuRedo.got,k); }
+  if(!it.cu) delete it.cu; it.cuK=k; };
+ for(const g of S0.groups||[]) for(const it of g.items||[]) fix(it);
+ /* statistiques de cuisson d'anciennes versions : clés inconnues conservées telles quelles (affichage limité aux clés connues) */
+ S0.pw.v101=1; return n; }
+{ const f=fixSave; fixSave=function(){ const r=f.apply(this,arguments); try{ v101Migrate(S); }catch(e){ console.error(e); } return r; }; }
+/* puce « cuissons possibles » sur les tickets cuisine */
+function v101KindChip(k){ const op=V101OPTS[k]; if(!op||k==='boeuf'||k==='hache') return ''; const L=op.map(c=>V98CU[c].n.toLowerCase()); return '<span class="chip warn">'+V98KIND[k]+' : '+(L.length>1?L.slice(0,-1).join(', ')+' ou '+L[L.length-1]:L[0])+' seulement</span>'; }
+/* stats du jour / du mois : plats renvoyés */
+{ const f=v98DayAgg; v98DayAgg=function(d){ const a=f.apply(this,arguments); const dd=d||S.day; a.redo=(dd&&dd.v101redo)||0; return a; }; }
+{ const f=v98AggAdd; v98AggAdd=function(a,b){ const r=f.apply(this,arguments); r.redo=(a.redo||0)+((b&&b.redo)||0); return r; }; }
+{ const f=v98CuChips; v98CuChips=function(a){ return f.apply(this,arguments)+'<span class="chip '+(a.redo?'warn':'')+'">🔁 renvoyés '+(a.redo||0)+'</span>'; }; }
+/* fiche employé : fiabilité selon le niveau */
+function v101Rel(s){ const pc=x=>Math.round(clamp(x,0,1)*1000)/10+' %'; const R=[];
+ if(s.role==='cook') R.push(['🍳 Cuisson ratée',v98MissP(s.id)]);
+ if(s.role==='waiter'||s.role==='bar'){ R.push(['📝 Erreur de commande',errRate(s)]); R.push(['🔍 Erreur repérée au passe',v101Catch(s,autOf(s)),1]); }
+ if(s.role!=='cook'&&s.role!=='waiter'&&s.role!=='bar') return '';
+ return '<div class="chips">'+R.map(r=>'<span class="chip '+(r[2]?(r[1]>=1?'ok':''):(r[1]<=0?'ok':r[1]>0.06?'warn':''))+'">'+r[0]+' : <b>'+pc(r[1])+'</b></span>').join('')+'</div><small class="muted">Plus le niveau monte, moins il y a d’erreurs ; au niveau maximum, plus aucune erreur.</small>'; }
+{ const f=viewStaff; viewStaff=function(){ let h=f.apply(this,arguments); try{ const s=ui.v94emp!=null&&S.staff.find(x=>x.id===ui.v94emp); if(s){ const r=v101Rel(s); if(r) h+=card('🎯 Fiabilité · '+s.name+' · niv '+s.skill,r); } }catch(e){ console.error(e); } return h; }; }
+{ const f=v98RepLine; v98RepLine=function(a){ const t=f.apply(this,arguments); return a&&a.redo?t.replace(/\.$/,'')+', plats renvoyés et refaits '+a.redo+'.':t; }; }
 
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
