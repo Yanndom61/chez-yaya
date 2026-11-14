@@ -4532,7 +4532,7 @@ const TRAV_DAYS_NOTE='Un jour de fermeture est compté dès demain ; la durée (
 Object.assign(TYP,{ travprime:{get:()=>S.pw.travPrime!=null?S.pw.travPrime:20,set(p,v){ S.pw.travPrime=v; return {ok:true}; },min:0,max:300} });
 function travConfirm(d){ panelOpen('trav',{d,plan:planClone(ED.plan)}); }
 PANELS.trav={t:()=>'🏗️ Travaux — confirmation',f(){
-  const d=PN.d.d, start=dayNum()+1, end=start+d.days-1, prime=TYP.travprime.get(), tk=!d.kitchen;
+  const d=PN.d.d, start=dayNum()+1, end=start+d.days-1, prime=TYP.travprime.get(), tk=false;
   const nw=S.staff.filter(s=>!s.tmp&&(tk?(s.role==='cook'||s.role==='dish'||s.id===counterId()):false)).length;
   let h='<div class="card"><h3>Résumé des travaux</h3><div class="chips"><span class="chip">🧱 '+d.changes+' modification(s)</span>'+(d.walls?'<span class="chip warn">murs / portes</span>':'')+(d.kitchen?'<span class="chip warn">cuisine</span>':'')+'</div>'+
     '<div class="kgrid"><div class="kpi"><span>⏱️ Durée</span><b>'+d.days+' jour'+(d.days>1?'s':'')+'</b><small>calculée automatiquement</small></div><div class="kpi"><span>💶 Coût</span><b>'+fm(d.cost)+'</b><small>payé maintenant</small></div></div>'+
@@ -4634,7 +4634,7 @@ function v6EndDay(ds){ const pw=S.pw; if(!pw) return; const d=dayNum();
   S.staff=S.staff.filter(s=>!s.tmp); }
 /* ---------- onglets enrichis ---------- */
 function viewHome(){ const ph=phaseV6(); if(ph==='prep'||ph==='j0') return prepHome(); let h=''; if(ph==='preo') h+=progCard();
-  if(S.trav&&dayNum()<=S.trav.end) h+=card('🏗️ Travaux '+(worksNow()?'en cours':'prévus'),'<p>Jour '+S.trav.start+' → '+S.trav.end+' · '+(S.trav.kitchen?'fermeture totale (pas de vente à emporter)':'vente à emporter -10 % maintenue')+(S.trav.gros?' · prime '+fm(S.trav.prime)+' par employé et par jour travaillé':'')+'</p>','cardwarn');
+  if(S.trav&&dayNum()<=S.trav.end) h+=card('🏗️ Travaux '+(worksNow()?'en cours':'prévus'),'<p>Jour '+S.trav.start+' → '+S.trav.end+' · '+(S.trav.kitchen?'fermeture totale (pas de vente à emporter)':'fermeture totale (pas de vente à emporter)')+(S.trav.gros?' · prime '+fm(S.trav.prime)+' par employé et par jour travaillé':'')+'</p>','cardwarn');
   if(ph==='open'&&seasonDue()) h+=card('🍂 Réunion de saison','<p>Dernière semaine du mois : le chef propose les plats de saison.</p>'+btn('Ouvrir la réunion','season',null,null,'primary'),'cardwarn');
   h+=repHomeCard();
   if(ph!=='prep') h+=tkCard();
@@ -5319,7 +5319,7 @@ PANELS.upg={t:()=>'🛍️ Améliorations',f(){ const zs=['all'].concat(Object.k
 function upgDates(u){ const d0=dayNum(), out=[]; const first=u.ph?d0+1:d0; for(let d=first;d<first+45;d++){ if(d<OPEN_DAY&&d!==d0&&false) continue; const ci=calInfo(d); const tag=closedOn(d)?' · 🔒 fermé':ci.ferie?' · 🔴 férié':ci.vac.length?' · 🧳 vacances':''; out.push([d,(d===d0?'Maintenant':dateStr(d))+tag]); } return out; }
 function upgBusy(start,ph){ const T=S.trav; const end=start+ph-1; const ex=(S.ext&&S.ext.sched||[]).find(x=>!(end<x.start||start>x.start+x.ph-1)); if(ex) return 'une extension des locaux est déjà prévue ces jours-là'; const ev=(S.priv||[]).find(e=>e.st==='booked'&&e.day>=start&&e.day<=end); if(ev) return 'un événement privé est confirmé le '+dateShort(ev.day); if(T&&!(end<T.start||start>T.end)) return 'des travaux sont déjà prévus du '+dateShort(T.start)+' au '+dateShort(T.end); const o=U().sched.find(x=>!(end<x.start||start>x.start+x.ph-1)); return o?'un autre chantier est déjà prévu ces jours-là':''; }
 function upgBuyPop(id){ const u=UPGS[id]; if(!u) return; const ds=upgDates(u); if(UI7.d==null||!ds.some(x=>x[0]===UI7.d)){ const cl=ds.find(x=>closedOn(x[0])); UI7.d=cl?cl[0]:ds[0][0]; }
-  const body='<b>'+u.n+'</b> · '+fm(u.c)+'<br><small>'+u.d+'</small><br><br>'+(u.ph?'🏗️ Travaux de <b>'+u.ph+' jour'+(u.ph>1?'s':'')+'</b> : '+(u.kit?'cuisine fermée (plus de vente à emporter), ':'')+'plus de repas sur place pendant ce temps'+((u.ph>3||u.kit)?' ; <b>gros travaux</b> : prime de '+fm(TYP.travprime.get())+' par employé et par jour travaillé':'')+'.<br><small>Astuce : choisissez un jour de fermeture (🔒) ou de faible affluence.</small><br><br>':'')
+  const body='<b>'+u.n+'</b> · '+fm(u.c)+'<br><small>'+u.d+'</small><br><br>'+(u.ph?'🏗️ Travaux de <b>'+u.ph+' jour'+(u.ph>1?'s':'')+'</b> : '+'<b>fermeture totale</b> (ni repas sur place, ni vente à emporter)'+((u.ph>3||u.kit)?' ; <b>gros travaux</b> : prime de '+fm(TYP.travprime.get())+' par employé et par jour travaillé':'')+'.<br><small>Astuce : choisissez un jour de fermeture (🔒) ou de faible affluence. Lancé le même jour qu’un autre chantier (ou pendant), il se fait en même temps : une seule fermeture, de la durée du plus long.</small><br><br>':'')
    +'<label style="display:flex;gap:8px;align-items:center"><span>Quand ?</span><select class="sl" data-sel="upgd">'+ds.map(x=>'<option value="'+x[0]+'"'+(x[0]===UI7.d?' selected':'')+'>'+x[1]+'</option>').join('')+'</select></label>'+(u.c>S.cash?'<p class="bad">Trésorerie insuffisante.</p>':'');
   showPopup({icon:u.e,title:'Installer : '+u.n,body,choices:[{label:'Confirmer · '+fm(u.c),cb(){ ACT.upgok(id); }},{label:'Annuler',cls:'ghost',cb(){}}]}); }
 document.addEventListener('change',e=>{ const el=e.target; if(el&&el.dataset&&el.dataset.sel==='upgd') UI7.d=+el.value; });
@@ -5328,7 +5328,7 @@ function upgBuy(id,day){ const u=UPGS[id]; if(!u||upgOn(id)||upgSched(id)) retur
   const d0=dayNum(); if(!u.ph||day<=d0&&!u.ph){ spend(u.c,'invest'); upgInstallNow(u); return {ok:true,msg:u.n+' installé(e) !'}; }
   if(day<=d0) return {ok:false,msg:'Les travaux commencent au plus tôt demain.'}; const b=upgBusy(day,u.ph); if(b) return {ok:false,msg:'Impossible : '+b+'.'};
   spend(u.c,'invest'); U().sched.push({id,start:day,ph:u.ph}); let n=0; try{ n=wkAfterPlan(); }catch(e){ console.error(e); }
-  return {ok:true,msg:'Travaux « '+u.n+' » prévus du '+dateShort(day)+' au '+dateShort(day+u.ph-1)+' ('+u.ph+' j).'+(n?' '+n+' client(s) appelé(s) (à emporter -10 % ou annulation : voir le journal).':'')}; }
+  return {ok:true,msg:'Travaux « '+u.n+' » prévus du '+dateShort(day)+' au '+dateShort(day+u.ph-1)+' ('+u.ph+' j).'+(n?' '+n+' réservation(s) annulée(s) ou reportée(s) : voir le journal.':'')}; }
 Object.assign(ACT,{ upgopen(){ panelOpen('upg'); }, upgz(z){ UI7.z=z; panelRender(true); }, upgbuy(id){ upgBuyPop(id); },
   upgok(id){ const u=UPGS[id], r=upgBuy(id,UI7.d!=null?UI7.d:dayNum()); if(r.ok){ note('🛍️ '+r.msg,'good'); toast(r.msg,'good'); } else toast(r.msg,'bad'); save(); renderTab(true); panelRender(true); },
   upgtog(id){ const o=U().on; o[id]=!o[id]; note((o[id]?'✔ Activé : ':'✖ Désactivé : ')+UPGS[id].n,'info'); panelRender(true); } });
@@ -5503,7 +5503,7 @@ const xRate=(pl,pur,m2)=>XPM[pl.pid||0]*XPUR[pur].m*(1+(xAdded()+m2/2)/120);    
 function xEdgeOK(pl,side){ return true; }                                          // plus aucune façade interdite : l'entrée est déplacée sur la nouvelle façade
 function xM2(pl,side,dp){ const len=(side==='right'||side==='left')?pl.H:pl.W; return dp*(len-2); }
 let xPrice=(pl,side,dp,pur)=>{ const m2=xM2(pl,side,dp); return Math.round(m2*xRate(pl,pur,m2)/10)*10; };
-const xDays=(m2,pur)=>clamp(2+Math.ceil(m2/30),3,7);
+const xDays=(m2,pur)=>7;
 function xExtend(pl,side,dp){ const W=pl.W,H=pl.H; const nW=(side==='right'||side==='left')?W+dp:W, nH=(side==='top'||side==='bottom')?H+dp:H; const ox=side==='left'?dp:0, oy=side==='top'?dp:0;
   const g=[]; for(let y=0;y<nH;y++){ let r=''; for(let x=0;x<nW;x++) r+=(x===0||y===0||x===nW-1||y===nH-1)?'W':'.'; g.push(r.split('')); }
   const moveE=[];
@@ -5519,7 +5519,7 @@ function xOrder(day){ const pl=S.plan, side=UX.s, dp=UX.dp, pur=UX.p;
   if(c>S.cash) return {ok:false,msg:'Trésorerie insuffisante : il manque '+fm(c-S.cash)+' (coût '+fm(c)+'). Choisissez une taille plus petite ou financez-vous par un emprunt.'};
   const w=xWhy(day,ph); if(w) return {ok:false,msg:'Impossible à cette date : '+w+'. Choisissez une autre date.'};
   spend(c,'invest'); XS().sched.push({id:nid(),start:day,ph,side,dp,pur,m2,c}); let n=0; try{ n=wkAfterPlan(); }catch(e){ console.error(e); }
-  return {ok:true,msg:'Extension de '+m2+' m² ('+XPUR[pur].n.toLowerCase()+') programmée du '+dateShort(day)+' au '+dateShort(day+ph-1)+' · '+fm(c)+'.'+(n?' '+n+' client(s) appelé(s) (à emporter -10 % ou annulation : voir le journal).':'')}; }
+  return {ok:true,msg:'Extension de '+m2+' m² ('+XPUR[pur].n.toLowerCase()+') programmée du '+dateShort(day)+' au '+dateShort(day+ph-1)+' · '+fm(c)+'.'+(n?' '+n+' réservation(s) annulée(s) ou reportée(s) : voir le journal.':'')}; }
 function v7ExtDay(){ const d=dayNum(), L=XS().sched; for(const s of L){ if(s.started||s.start>d) continue; if(S.trav){ s.start=d+1; note('🏗️ Extension repoussée d’un jour (autres travaux en cours).','warn'); continue; }
     const np=v99Ext(xExtend(S.plan,s.side,s.dp),s.pur); S.trav={start:d,end:d+s.ph-1,days:s.ph,cost:0,kitchen:s.pur==='cuisine',gros:true,prime:TYP.travprime.get(),plan:np,walls:true,ext:s.id}; s.started=true; note('🏗️ Début des travaux d’extension ('+s.m2+' m²).','info'); } }
 function v7ExtDone(T){ if(!T||!T.ext) return; const L=XS(); const s=L.sched.find(x=>x.id===T.ext); if(s){ L.sched=L.sched.filter(x=>x.id!==T.ext); L.done.push({m2:s.m2,pur:s.pur,day:dayNum()}); S.pw.ext=(S.pw.ext||0)+s.m2; note('🏗️ Extension terminée : +'+s.m2+' m² ('+XPUR[s.pur].n.toLowerCase()+'). Aménagez-la dans l’éditeur : Plan → Travaux.','good'); toast('Extension livrée : +'+s.m2+' m². À aménager dans l’éditeur de plan.','good'); } }
@@ -5533,7 +5533,7 @@ PANELS.ext={t:()=>'📐 Agrandir le local',f(){ const pl=S.plan, side=UX.s, dp=U
   h+='<div class="card"><h3>1 · Usage prévu</h3><div class="btnrow" style="flex-wrap:wrap">'+Object.keys(XPUR).map(k=>btn(XPUR[k].e+' '+XPUR[k].n,'extp',k,null,k===pur?'primary sm':'ghost sm')).join('')+'</div>'
    +'<h3>2 · Façade</h3><div class="btnrow" style="flex-wrap:wrap">'+Object.keys(XSIDE).map(k=>btn(XSIDE[k],'exts',k,null,k===side?'primary sm':'ghost sm')).join('')+'</div>'
    +'<h3>3 · Profondeur</h3><div class="btnrow" style="flex-wrap:wrap">'+[1,2,3,4,6,8].map(k=>btn(k+' m · '+fm(xPrice(pl,side,k,pur)),'extd',k,null,k===dp?'primary sm':'ghost sm')).join('')+'</div></div>';
-  h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+((side==='right'||side==='left')?(pl.W+dp)+'×'+pl.H:pl.W+'×'+(pl.H+dp))+'<br>Coût : <b>'+fm(c)+'</b> · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+(pur==='cuisine'?'cuisine fermée, ':'')+'gros travaux : plus de repas sur place, prime et congés selon la règle des travaux)</p>'
+  h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+((side==='right'||side==='left')?(pl.W+dp)+'×'+pl.H:pl.W+'×'+(pl.H+dp))+'<br>Coût : <b>'+fm(c)+'</b> · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+'gros travaux : fermeture totale, prime travaux ; lancée le même jour qu’un autre chantier, tout se fait en une seule fermeture)</p>'
    +'<label style="display:flex;gap:8px;align-items:center"><span>Quand ?</span><select class="sl" data-sel="extwhen">'+ds.map(x=>'<option value="'+x[0]+'"'+(x[0]===UX.d?' selected':'')+(x[2]?'':' disabled')+'>'+x[1]+'</option>').join('')+'</select></label>'
    +(c>S.cash?'<p class="bad">Trésorerie insuffisante : il manque '+fm(c-S.cash)+'. Choisissez une taille plus petite ou un emprunt (onglet Finances).</p>':'')
    +btn('Commander l’extension · '+fm(c),'extgo',null,null,'primary')+'</div>';
@@ -6186,7 +6186,7 @@ function v8TravClients(T){ const W=S.vm; let rep=0,ann=0,rapp=0;
 
 { const _v6w=v6WorksDayStart; v6WorksDayStart=function(){ const T=S.trav; if(T&&dayNum()===T.start&&!T.v8) v8TravStart(T); _v6w();
   /* livraisons veille réouverture */
-  if(T&&dayNum()===T.end){ note('🚚 Les livraisons fournisseurs reprennent demain (veille de réouverture = aujourd’hui : commandes autorisées).','info'); try{ if(S.autoStock!==false) autoOrderAll('veille-réouverture'); }catch(e){} }
+  if(T&&dayNum()===T.end){ if(v102NextWorks()) note('🏗️ Un autre chantier commence demain : pas de commande de marchandises avant la vraie veille de réouverture.','info'); else { note('🚚 Les livraisons fournisseurs reprennent demain (veille de réouverture = aujourd’hui : commandes autorisées).','info'); try{ if(S.autoStock!==false) autoOrderAll('veille-réouverture'); }catch(e){} } }
   if(T&&dayNum()>T.end){ /* fin : boost formation */ for(const s of S.staff){ if(s.trn&&s.trn.v8){ s.skill=clamp(s.skill+1,1,S.mich&&S.mich.star?20:10); for(const k of ['vit','qua','ami','aut','hyg']) if(s.lv&&s.lv[k]!=null) s.lv[k]=clamp(s.lv[k]+1,0,S.mich&&S.mich.star?20:10); s.trn=null; } }
     S.vm.on=0; note('🎉 Réouverture ! L’équipe a progressé pendant les travaux.','good'); } }; }
 
@@ -6569,7 +6569,7 @@ PANELS.ext = { t:()=>'🏗️ Travaux · Extensions supplémentaires', f(){
   }
   h+='</div>';
 
-  h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+xDimLabel(pl,side,dp)+'<br>Coût : <b>'+(c?fm(c):'0 € · gratuit')+'</b> · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+(pur==='cuisine'?'cuisine fermée, ':'')+'gros travaux : fermeture totale, prime et congés selon la règle des travaux)</p>'
+  h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+xDimLabel(pl,side,dp)+'<br>Coût : <b>'+(c?fm(c):'0 € · gratuit')+'</b> · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+'gros travaux : fermeture totale, prime travaux ; lancée le même jour qu’un autre chantier, tout se fait en une seule fermeture)</p>'
    +'<label style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Quand ?</span><select class="sl" data-sel="extwhen">'+ds.map(x=>'<option value="'+x[0]+'"'+(x[0]===UX.d?' selected':'')+(x[2]?'':' disabled')+'>'+x[1]+'</option>').join('')+'</select></label>'
    +(c>S.cash?'<p class="bad">Trésorerie insuffisante : il manque '+fm(c-S.cash)+'. Réduisez la taille ou empruntez (onglet Finances).</p>':'')
    +'<div class="btnrow" style="flex-wrap:wrap;margin-top:8px">'
@@ -7214,7 +7214,7 @@ PANELS.ext = { t:()=>'🏗️ Travaux · Extensions', f(){
     +'<div class="btnrow">'+btn('✏️ Modifier le plan (éditeur)','travedit',null,null,'primary')+'</div></div>';
   h+='<div class="card"><p class="muted">🎁 <b>100 m² offerts à chaque extension</b> (carré 10×10). Seuls les m² <b>au-delà de 100</b> sont payants : '+XPM[pl.pid||0]+' €/m² de base (×'+XPUR[pur].m+' pour '+XPUR[pur].n.toLowerCase()+'), de plus en plus cher avec la surface ajoutée'
     +(added?' · déjà ajouté <b>+'+added+' m²</b>':'')+' · m² au-delà à ≈ <b>'+rate+' €/m²</b>.</p>'
-    +'<p class="muted" style="margin:0">La façade choisie s’ouvre sur l’extension ; si l’entrée s’y trouve, elle est déplacée sur la nouvelle façade. Les extensions gardent leurs jours de travaux ; à la fin, l’extension est <b>visible et intégrée</b> sur le plan.</p></div>';
+    +'<p class="muted" style="margin:0">La façade choisie s’ouvre sur l’extension ; si l’entrée s’y trouve, elle est déplacée sur la nouvelle façade. Les extensions demandent 7 jours de travaux (fermeture totale ; une amélioration lancée le même jour se fait en même temps) ; à la fin, l’extension est <b>visible et intégrée</b> sur le plan.</p></div>';
   h+='<div class="card"><h3>1 · Usage prévu</h3><div class="btnrow" style="flex-wrap:wrap">'+Object.keys(XPUR).map(k=>btn(XPUR[k].e+' '+XPUR[k].n,'extp',k,null,k===pur?'primary sm':'ghost sm')).join('')+'</div>'
    +'<h3>2 · Façade</h3><div class="btnrow" style="flex-wrap:wrap">'+Object.keys(XSIDE).map(k=>btn(XSIDE[k],'exts',k,null,k===side?'primary sm':'ghost sm')).join('')+'</div>'
    +'<h3>3 · Construction</h3><div class="btnrow" style="flex-wrap:wrap">'
@@ -7227,7 +7227,7 @@ PANELS.ext = { t:()=>'🏗️ Travaux · Extensions', f(){
       +'<p class="muted" style="margin:6px 0 0">Jusqu’à 100 m² : gratuit. Au-delà : seuls les m² supplémentaires sont facturés.</p>';
   } else h+='<p class="muted" style="margin:8px 0 0">Extension offerte : <b>+'+m2+' m²</b> (équivalent carré 10×10) sur la façade choisie → local <b>'+xDimLabel(pl,side,dp)+'</b>.</p>';
   h+='</div>';
-  h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+xDimLabel(pl,side,dp)+'<br>Coût : <b>'+(c?fm(c)+'</b> (dont '+Math.min(m2,X94_FREE)+' m² offerts)':'0 € · gratuit</b>')+' · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+(pur==='cuisine'?'cuisine fermée, ':'')+'gros travaux : fermeture totale, prime et congés selon la règle des travaux)</p>'
+  h+='<div class="card"><h3>Résumé</h3><p>Nouvelle surface : <b>+'+m2+' m²</b> → local '+xDimLabel(pl,side,dp)+'<br>Coût : <b>'+(c?fm(c)+'</b> (dont '+Math.min(m2,X94_FREE)+' m² offerts)':'0 € · gratuit</b>')+' · trésorerie '+fm(S.cash)+' · travaux : <b>'+ph+' jour'+(ph>1?'s':'')+'</b> ('+'gros travaux : fermeture totale, prime travaux ; lancée le même jour qu’un autre chantier, tout se fait en une seule fermeture)</p>'
    +'<label style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>Quand ?</span><select class="sl" data-sel="extwhen">'+ds.map(x=>'<option value="'+x[0]+'"'+(x[0]===UX.d?' selected':'')+(x[2]?'':' disabled')+'>'+x[1]+'</option>').join('')+'</select></label>'
    +(c>S.cash?'<p class="bad">Trésorerie insuffisante : il manque '+fm(c-S.cash)+'. Réduisez la taille ou empruntez (onglet Finances).</p>':'')
    +'<div class="btnrow" style="flex-wrap:wrap;margin-top:8px">'+btn('👀 Voir le plan avant de lancer','extprev',null,null,'ghost')+btn('Commander l’extension · '+(c?fm(c):'gratuit'),'extgo',null,null,'primary')+'</div></div>';
@@ -10463,6 +10463,212 @@ function v101Rel(s){ const pc=x=>Math.round(clamp(x,0,1)*1000)/10+' %'; const R=
  return '<div class="chips">'+R.map(r=>'<span class="chip '+(r[2]?(r[1]>=1?'ok':''):(r[1]<=0?'ok':r[1]>0.06?'warn':''))+'">'+r[0]+' : <b>'+pc(r[1])+'</b></span>').join('')+'</div><small class="muted">Plus le niveau monte, moins il y a d’erreurs ; au niveau maximum, plus aucune erreur.</small>'; }
 { const f=viewStaff; viewStaff=function(){ let h=f.apply(this,arguments); try{ const s=ui.v94emp!=null&&S.staff.find(x=>x.id===ui.v94emp); if(s){ const r=v101Rel(s); if(r) h+=card('🎯 Fiabilité · '+s.name+' · niv '+s.skill,r); } }catch(e){ console.error(e); } return h; }; }
 { const f=v98RepLine; v98RepLine=function(a){ const t=f.apply(this,arguments); return a&&a.redo?t.replace(/\.$/,'')+', plats renvoyés et refaits '+a.redo+'.':t; }; }
+
+/* ===== v10.2 w102a.js ===== */
+/* v10.2 a — formation sommelier (salle + bar), travaux combinés en une seule fermeture, dépenses/stock/emporter pendant les travaux */
+/* ---------- 1. Sommelier : toute l'équipe de salle et du bar ---------- */
+const V102_SOMM_ROLES=['waiter','bar'];
+try{ SKILLS.sommellerie.d='Toute l’équipe de salle et du bar (serveurs, commis de salle, responsable de salle, barmans) : le vin est mieux conseillé, +45 % de verres vendus et des clients plus contents.'; }catch(e){}
+A_trainSkill=function(id,key){
+  const s=S.staff.find(x=>x.id===id), K=SKILLS[key]; if(!s||!K||s.trn) return {ok:false,msg:'Indisponible.'};
+  if(s.sk[key]) return {ok:false,msg:'Compétence déjà acquise.'};
+  const okRole=key==='sommellerie'?V102_SOMM_ROLES.includes(s.role):(K.role==='any'||K.role===s.role);
+  if(!okRole) return {ok:false,msg:key==='sommellerie'?'Réservé à l’équipe de salle et du bar.':'Réservé aux '+(K.role==='cook'?'cuisiniers':'serveurs')+'.'};
+  if(K.c>S.cash) return {ok:false,msg:'Trésorerie insuffisante ('+money(K.c)+').'};
+  spend(K.c,'other'); removeStaffWork(id); s.trn={k:key,kind:'skill',until:(Math.floor(S.t/1440)+(S.awaitNext?2:1))*1440+DAYSTART,cost:K.c};
+  return {ok:true,msg:s.name+' part en stage « '+K.n+' » : absent(e) jusqu’à demain matin'+(S.awaitNext?' (après-demain)':'')+'.'}; };
+const v102IsWine=id=>id==='vin'||!!(DISH[id]&&DISH[id].bar&&DISH[id].rec&&DISH[id].rec.vin);
+const V102_SOMM_SAT=0.08;
+{ const f=judge; judge=function(g){ const r=f(g); try{ if(r&&typeof r.stars==='number'&&g&&g.items&&g.items.some(i=>i&&v102IsWine(i.d))&&hasSommelier()){ r.stars=clamp(r.stars+V102_SOMM_SAT,1,5); r.v102somm=1; } }catch(e){ console.error(e); } return r; }; }
+
+/* ---------- 2. Travaux combinés ---------- */
+try{ for(const u of Object.values(UPGS)) if(u.d&&u.d.includes('Cuisine fermée pendant les travaux.')) u.d=u.d.replace('Cuisine fermée pendant les travaux.','Fermeture totale pendant les travaux.'); }catch(e){}
+const v102H=m=>Math.floor(m/60)+'h'+(m%60?String(m%60).padStart(2,'0'):'');
+const v102UpgGros=u=>!!u&&(u.ph>3||!!u.kit);
+function v102TItems(T){ const L=[]; if(!T) return L;
+  if(T.v96move) L.push({n:'Déménagement',e:'🚚',ext:0,gros:true});
+  for(const id of (T.upg||[])) if(UPGS[id]) L.push({n:UPGS[id].n,e:UPGS[id].e,ext:0,gros:v102UpgGros(UPGS[id])});
+  if(T.ext){ const s=(XS().sched||[]).find(x=>x.id===T.ext); L.push({n:'Agrandissement'+(s&&s.m2?' '+s.m2+' m²':''),e:'📐',ext:1,gros:true}); }
+  if(!L.length) L.push({n:T.plan?'Réaménagement':'Travaux',e:'🏗️',ext:0,gros:!!T.gros});
+  return L; }
+function v102Items(extra){ const L=[];
+  try{ for(const s of U().sched) if(!s.started&&UPGS[s.id]) L.push({start:s.start,end:s.start+Math.max(1,s.ph||1)-1,n:UPGS[s.id].n,e:UPGS[s.id].e,ext:0,gros:v102UpgGros(UPGS[s.id])}); }catch(e){}
+  try{ for(const s of XS().sched) if(!s.started) L.push({start:s.start,end:s.start+Math.max(1,s.ph||1)-1,n:'Agrandissement '+s.m2+' m²',e:'📐',ext:1,gros:true}); }catch(e){}
+  if(extra) L.push(Object.assign({x:1},extra));
+  return L.sort((a,b)=>a.start-b.start||(a.x?1:0)-(b.x?1:0)); }
+/* chantiers (fenêtres de fermeture) : en cours + programmés ; un élément qui démarre pendant un chantier le rejoint */
+function v102Wins(extra){ const d=dayNum(), T=S&&S.trav, out=[];
+  if(T&&T.end>=d) out.push({start:T.start,end:T.end,items:v102TItems(T),ext:T.ext?1:0,cur:1,move:!!T.v96move,gros:!!T.prime||v102TItems(T).some(i=>i.gros)});
+  for(const p of v102Items(extra)){ const w=out.find(w=>!w.move&&p.start>=w.start&&p.start<=w.end);
+    if(w){ w.end=Math.max(w.end,p.end); w.items.push(p); w.ext+=p.ext; if(p.x) w.x=1; if(p.gros) w.gros=true; }
+    else out.push({start:p.start,end:p.end,items:[p],ext:p.ext,gros:!!p.gros,x:p.x?1:0}); }
+  return out.sort((a,b)=>a.start-b.start); }
+const v102WinNames=w=>w.items.map(i=>i.e+' '+i.n).join(', ');
+const v102WinOf=d=>v102Wins().find(w=>d>=w.start&&d<=w.end)||null;
+/* contrôle d'une date de début : regroupement autorisé si le chantier démarre pendant un chantier prévu */
+function v102Busy(start,ph,kind){ const end=start+Math.max(1,ph)-1;
+  const W=v102Wins({start,end,n:'nouveau',e:'',ext:kind==='ext'?1:0,gros:true}); const nw=W.find(w=>w.x);
+  if(!nw) return '';
+  const mv=W.find(w=>w.move&&!(nw.end<w.start||nw.start>w.end)); if(mv) return 'un déménagement est prévu du '+dateShort(mv.start)+' au '+dateShort(mv.end);
+  if(nw.ext>1) return 'une autre extension est déjà prévue sur ces dates (une seule extension par chantier)';
+  const ov=W.find(w=>w!==nw&&!(nw.end<w.start||nw.start>w.end)); if(ov) return 'un chantier est déjà prévu du '+dateShort(ov.start)+' au '+dateShort(ov.end)+' : choisissez le '+dateShort(ov.start)+' (ou un jour de ce chantier) pour tout faire en une seule fermeture';
+  const ev=(S.priv||[]).find(e=>e.st==='booked'&&e.day>=nw.start&&e.day<=nw.end&&e.day>=start); if(ev) return 'un événement privé est confirmé le '+dateShort(ev.day);
+  return ''; }
+/* upgBusy (contrôle strict) reste utilisé pour le déménagement */
+xWhy=function(day,ph){ if(day<=dayNum()) return 'les travaux commencent au plus tôt demain'; return v102Busy(day,ph,'ext'); };
+{ const f=evBusy; evBusy=function(d){ return f(d)||v102Wins().some(w=>d>=w.start&&d<=w.end); }; }
+/* prolongation d'un chantier déjà commencé (fermeture totale v8 active) */
+function v102Prolong(T,oldEnd){ if(!T||T.end<=oldEnd) return;
+  if(S.vm&&S.vm.on){ S.vm.until=T.end; (S.vm.log=S.vm.log||[]).unshift({d:dayNum(),msg:'Boîte vocale prolongée jusqu’au '+dateShort(T.end+1)+'.'}); }
+  for(const s of S.staff) if(s.trn&&s.trn.v8) s.trn.until=T.end*1440+DAYSTART;
+  try{ wkPost('🚧 Travaux prolongés : '+rName()+' reste fermé jusqu’au '+dateShort(T.end)+'. Réouverture le '+dateShort(T.end+1)+' ! #travaux'); }catch(e){}
+  try{ v8TravClients(T); }catch(e){ console.error(e); } }
+function v102Join(T,s,kind){ const d=dayNum(), oldEnd=T.end; let nm='';
+  if(kind==='ext'){ const base=T.plan||S.plan; T.plan=v99Ext(xExtend(base,s.side,s.dp),s.pur); T.walls=true; T.ext=s.id; T.end=Math.max(T.end,Math.max(d,s.start)+s.ph-1); T.gros=true; if(!T.prime) T.prime=TYP.travprime.get(); nm='Agrandissement '+s.m2+' m²'; }
+  else { const u=UPGS[s.id]; (T.upg=T.upg||[]).push(s.id); T.end=Math.max(T.end,Math.max(d,s.start)+u.ph-1); if(v102UpgGros(u)){ T.gros=true; if(!T.prime) T.prime=TYP.travprime.get(); } nm=u.n; }
+  s.started=true; T.kitchen=true; T.days=T.end-T.start+1; T.v102=1;
+  note('🏗️ Chantier « '+nm+' » regroupé avec les travaux en cours'+(T.end>oldEnd?' : fermeture prolongée jusqu’au '+dateShort(T.end)+' (réouverture le '+dateShort(T.end+1)+')':' (la fermeture n’est pas prolongée)')+'.','info');
+  if(T.end>oldEnd&&T.v8) v102Prolong(T,oldEnd);
+  return T.end>oldEnd; }
+/* un chantier terminé la veille est clôturé avant d'en démarrer un nouveau le jour même */
+function v102CloseFinished(){ const T=S.trav; if(T&&!T.v96move&&dayNum()>T.end){ try{ v6WorksDayStart(); }catch(e){ console.error(e); } } }
+v7UpgDay=function(){ const d=dayNum(), L=U().sched; if(!L.length) return;
+  for(const s of L.slice().sort((a,b)=>a.start-b.start)){ if(s.started||s.start>d) continue; const u=UPGS[s.id]; if(!u) continue;
+    v102CloseFinished(); const T=S.trav;
+    if(T&&(T.v96move||d<T.start||d>T.end)){ s.start=d+1; note('🏗️ Chantier « '+u.n+' » repoussé d’un jour (déménagement en cours).','warn'); continue; }
+    if(T){ v102Join(T,s,'upg'); continue; }
+    const g=v102UpgGros(u); S.trav={start:d,end:d+u.ph-1,days:u.ph,cost:0,kitchen:true,gros:g,prime:g?TYP.travprime.get():0,plan:null,walls:false,upg:[s.id],v102:1}; s.started=true; } };
+v7ExtDay=function(){ const d=dayNum(), L=XS().sched;
+  for(const s of L.slice().sort((a,b)=>a.start-b.start)){ if(s.started||s.start>d) continue;
+    v102CloseFinished(); const T=S.trav;
+    if(T&&(T.v96move||d<T.start||d>T.end||T.ext)){ s.start=(T.ext&&!T.v96move&&d<=T.end)?T.end+1:d+1; note('🏗️ Extension repoussée au '+dateShort(s.start)+' ('+(T.v96move?'déménagement':'autre extension')+' en cours).','warn'); continue; }
+    if(T){ v102Join(T,s,'ext'); continue; }
+    const np=v99Ext(xExtend(S.plan,s.side,s.dp),s.pur); S.trav={start:d,end:d+s.ph-1,days:s.ph,cost:0,kitchen:true,gros:true,prime:TYP.travprime.get(),plan:np,walls:true,ext:s.id,v102:1}; s.started=true; note('🏗️ Début des travaux d’extension ('+s.m2+' m²).','info'); } };
+/* achat d'une amélioration : même date qu'un chantier = regroupement ; pendant un chantier : « maintenant » */
+upgDates=function(u){ const d0=dayNum(), out=[], T=S.trav, joinNow=!!(u.ph&&T&&worksNow()&&!T.v96move); const W=u.ph?v102Wins():[];
+  if(joinNow) out.push([d0,'Maintenant (rejoint le chantier en cours, jusqu’au '+dateShort(Math.max(T.end,d0+u.ph-1))+')']);
+  const first=u.ph?d0+1:d0; for(let d=first;d<first+45;d++){ const ci=calInfo(d); const w=W.find(w=>d>=w.start&&d<=w.end);
+    const tag=w?(d===w.start?' · 🏗️ même jour que le chantier prévu (une seule fermeture)':' · 🏗️ pendant un chantier (regroupé)'):closedOn(d)?' · 🔒 fermé':ci.ferie?' · 🔴 férié':ci.vac.length?' · 🧳 vacances':'';
+    out.push([d,(d===d0?'Maintenant':dateStr(d))+tag]); } return out; };
+function v102Dots(r){ if(r&&r.msg) r.msg=r.msg.replace(/\.\.(?=\s|$)/g,'.'); return r; }
+{ const f=xOrder; xOrder=function(){ return v102Dots(f.apply(this,arguments)); }; }
+upgBuy=function(id,day){ return v102Dots(v102UpgBuy(id,day)); };
+function v102UpgBuy(id,day){ const u=UPGS[id]; if(!u||upgOn(id)||upgSched(id)) return {ok:false,msg:'Déjà installé ou prévu.'}; if(u.c>S.cash) return {ok:false,msg:'Trésorerie insuffisante.'};
+  const d0=dayNum(); if(!u.ph){ spend(u.c,'invest'); upgInstallNow(u); return {ok:true,msg:u.n+' installé(e) !'}; }
+  const T=S.trav;
+  if(day<=d0){ if(!(T&&worksNow()&&!T.v96move)) return {ok:false,msg:'Les travaux commencent au plus tôt demain.'};
+    const hi=Math.max(T.end,d0+u.ph-1); const ev=(S.priv||[]).find(e=>e.st==='booked'&&e.day>T.end&&e.day<=hi); if(ev) return {ok:false,msg:'Impossible : un événement privé est confirmé le '+dateShort(ev.day)+'.'};
+    spend(u.c,'invest'); const s={id,start:d0,ph:u.ph}; U().sched.push(s); v102Join(T,s,'upg'); let n=0; try{ n=wkAfterPlan(); }catch(e){ console.error(e); }
+    return {ok:true,msg:'« '+u.n+' » rejoint le chantier en cours : fermeture jusqu’au '+dateShort(T.end)+', réouverture le '+dateShort(T.end+1)+'.'+(n?' '+n+' réservation(s) annulée(s) : voir le journal.':'')}; }
+  const b=v102Busy(day,u.ph,'upg'); if(b) return {ok:false,msg:'Impossible : '+b+'.'};
+  spend(u.c,'invest'); U().sched.push({id,start:day,ph:u.ph}); let n=0; try{ n=wkAfterPlan(); }catch(e){ console.error(e); }
+  const w=v102WinOf(day); const grp=w&&w.items.length>1;
+  return {ok:true,msg:'Travaux « '+u.n+' » prévus du '+dateShort(day)+' au '+dateShort(day+u.ph-1)+' ('+u.ph+' j).'+(grp?' Regroupés avec '+(w.items.length-1)+' autre(s) chantier(s) : une seule fermeture du '+dateShort(w.start)+' au '+dateShort(w.end)+' ('+(w.end-w.start+1)+' j).':'')+(n?' '+n+' réservation(s) annulée(s) : voir le journal.':'')}; }
+
+/* ---------- 3. Pendant les travaux : fermeture totale, aucun achat, aucune vente ---------- */
+wkWins=function(){ return v102Wins().map(w=>({start:w.start,end:w.end,kitchen:true,n:v102WinNames(w)})); };
+wkAnnounce=function(w){ const W=WK(), k='w'+w.start; W.annE=W.annE||{}; const A=dateShort(w.start), B=dateShort(w.end), R=dateShort(w.end+1);
+  if(W.ann[k]){ if(W.annE[k]!=null&&W.annE[k]!==w.end){ W.annE[k]=w.end; wkPost('🚧 Mise à jour travaux : fermeture totale du '+A+' au '+B+' ('+w.n+'). Ni service en salle ni vente à emporter. Réouverture le '+R+' ! #travaux'); note('📱 Piaf — annonce des travaux mise à jour ('+A+' → '+B+').','info'); return true; } if(W.annE[k]==null) W.annE[k]=w.end; return false; }
+  W.ann[k]=dayNum(); W.annE[k]=w.end;
+  wkPost('🚧 Fermeture totale du '+A+' au '+B+' pour travaux ('+w.n+') : ni service en salle ni vente à emporter. On revient plus beau le '+R+' ! #travaux');
+  note('📱 Piaf — annonce automatique des travaux : fermeture totale ('+A+' → '+B+').','info');
+  if(typeof toast==='function') toast('📱 Travaux annoncés sur Piaf ('+A+' → '+B+').','good'); return true; };
+wkRemind=function(w){ const W=WK(), k='w'+w.start; if(W.rem[k]) return; W.rem[k]=1; if(W.ann[k]===dayNum()) return;
+  wkPost('⏰ Rappel : fermeture totale dès demain ('+dateShort(w.start)+') pour travaux. À bientôt le '+dateShort(w.end+1)+' !','works'); note('📱 Piaf — rappel de la veille publié : travaux dès demain.','info'); };
+wkCalls=function(w){ let n=0; for(const r of S.res){ if(r.state==='booked'||r.state==='confirmed'||!r.state){ const dd=Math.floor(r.t/1440)+1; if(dd>=w.start&&dd<=w.end){ n++; wkCallRes(r,true); } } }
+  if(n&&typeof toast==='function') toast('📞 '+n+' réservation(s) annulée(s) : fermeture totale pour travaux.','warn'); return n; };
+wkCard=function(){ const T=S.trav; if(!T||!worksNow()) return '';
+  return card('⛔ Fermeture totale','<p>Travaux : <b>aucune vente</b>, ni sur place ni à emporter, jusqu’au '+dateShort(T.end)+'. Réouverture le '+dateShort(T.end+1)+'.</p>','cardwarn'); };
+/* menu du jour : aucune réservation de portions (donc aucune consommation de stock) un jour de travaux */
+{ const f=mdjReserve; mdjReserve=function(){ if(S&&S.trav&&worksNow()) return 0; return f.apply(this,arguments); }; }
+/* aucun achat pendant les travaux, sauf la veille de la réouverture (stocks prêts, jamais de rupture) */
+function v102NextWorks(){ const T=S&&S.trav; return !!(T&&!T.v96move&&v102Items().some(p=>p.start===T.end+1)); }
+function v102NoBuy(){ const T=S&&S.trav; return !!(T&&worksNow()&&(dayNum()<T.end||v102NextWorks())); }
+{ const f=placeOrder_v5; placeOrder_v5=function(){ if(v102NoBuy()) return {ok:false,msg:'Travaux en cours : aucun achat avant la veille de la réouverture ('+dateShort(S.trav.end)+').'}; return f.apply(this,arguments); }; }
+/* prime travaux (gros chantier) : versée à chaque employé présent, c'est un salaire */
+v6Bonus=function(){ const T=S.trav; if(!S.pw||!T||!worksNow()||!T.prime) return 0; const n=S.staff.filter(s=>!s.tmp&&!s.off&&!absentDay(s)).length; return n*T.prime; };
+{ const f=A_staffOrder; A_staffOrder=function(){ if(v102NoBuy()) return {ok:false,msg:'Travaux en cours : aucun achat avant la veille de la réouverture.'}; return f.apply(this,arguments); }; }
+{ const f=v95Crs; v95Crs=function(){ if(v102NoBuy()) return {ok:false,msg:'Travaux en cours : pas de courses avant la veille de la réouverture.'}; return f.apply(this,arguments); }; }
+try{ for(const ev of EVENTS) if(ev.id==='promo'){ const f=ev.fire; ev.fire=function(){ if(v102NoBuy()) return; return f.apply(this,arguments); }; } }catch(e){ console.error(e); }
+
+/* ===== v10.2 w102b.js ===== */
+/* v10.2 b — calendrier (noms des événements et des chantiers + fenêtre de détail), Accueil sans cahier d'événements, bilan d'un jour de travaux */
+/* ---------- Accueil : plus de « Cahier d'événements » ni de boutons + Anniversaire / + Séminaire ---------- */
+evtBookCard=function(){ return ''; };
+try{ delete ACT.evtadd; }catch(e){}
+/* ---------- Historique des chantiers (pour le calendrier des jours passés) ---------- */
+function v102Hist(){ S.pw=S.pw||{}; return S.pw.v102h=S.pw.v102h||[]; }
+{ const f=v6WorksDayStart; v6WorksDayStart=function(){ const T=S.trav, d=dayNum(); let rec=null; if(T&&!T.v96move&&d>T.end) rec={start:T.start,end:T.end,items:v102TItems(T).map(i=>i.e+' '+i.n)};
+  const r=f.apply(this,arguments); try{ if(rec&&!S.trav){ const H=v102Hist(); if(!H.some(h=>h.start===rec.start)) H.push(rec); while(H.length>40) H.shift(); } }catch(e){ console.error(e); } return r; }; }
+/* ---------- Contenu d'un jour ---------- */
+const V102_ST={call:'📞 demande reçue',menu:'📝 proposition en préparation',neg:'💬 en négociation',counter:'💬 contre-proposition du client',booked:'✅ confirmé',done:'✔️ a eu lieu',lost:'✖️ annulé'};
+function v102DayEvents(d){ return (S.priv||[]).filter(e=>e&&e.day===d&&EVT[e.k]&&e.st!=='lost').sort((a,b)=>(a.a||0)-(b.a||0)); }
+function v102DayWorks(d){ const w=v102Wins().find(w=>d>=w.start&&d<=w.end); if(w) return {start:w.start,end:w.end,names:w.items.map(i=>i.e+' '+i.n),move:!!w.move};
+  const h=(S.pw&&S.pw.v102h||[]).find(h=>d>=h.start&&d<=h.end); return h?{start:h.start,end:h.end,names:h.items,past:1}:null; }
+function v102DayBook(d){ return (S.evtBook||[]).filter(e=>e&&e.day===d&&!e.v102ev); }
+const v102EvLabel=e=>(EVT[e.k]?EVT[e.k].e:'🎉')+' '+(e.a!=null?v102H(e.a)+' ':'')+e.name;
+/* case du calendrier : noms (et heure) des événements, chantiers */
+{ const f=calCell; calCell=function(sr){ let h=f(sr); try{ const d=dayOfSer(sr); if(d<1) return h; const L=[];
+    const wk=v102DayWorks(d); if(wk) L.push('<span class="v102l w">'+(wk.move?'🚚':'🏗️')+' '+wk.names.map(x=>x.replace(/^\S+\s/,'')).join(' + ')+'</span>');
+    for(const e of v102DayEvents(d).filter(e=>e.st==='booked'||e.st==='done')) L.push('<span class="v102l'+(e.st==='done'?' p':'')+'">'+v102EvLabel(e)+'</span>');
+    for(const e of v102DayBook(d)) L.push('<span class="v102l p">📒 '+v102H(e.t||1140)+' '+e.name+'</span>');
+    if(!L.length) return h; const more=L.length>2?'<span class="v102m">+'+(L.length-2)+'</span>':'';
+    h=h.replace('<span class="ic">','<span class="v102ls">'+L.slice(0,2).join('')+more+'</span><span class="ic">');
+    if(wk) h=h.replace('class="cc','class="cc v102w'); } catch(e){ console.error(e); } return h; }; }
+/* détail d'un jour (fenêtre et carte sous le calendrier) */
+function v102EvDetail(e){ const T=EVT[e.k]||{n:'Événement',e:'🎉'}; const ds=(e.dishes||[]).filter(Boolean).map(id=>DISH[id]?DISH[id].e+' '+DISH[id].n:id);
+  const tabs=(e.tabs&&e.tabs.length)?'Tables n° '+e.tabs.map(j=>j+1).join(', '):'Salle principale · tables réunies automatiquement 1 h avant l’arrivée';
+  const row=(l,v)=>'<div class="srow"><span>'+l+'</span><b>'+v+'</b></div>';
+  let b='<div class="card" style="margin:6px 0"><b>'+T.e+' '+e.name+'</b> <span class="chip'+(e.st==='booked'?' ok':'')+'">'+(V102_ST[e.st]||e.st)+'</span><div class="sum" style="margin-top:4px">'
+    +row('Type',T.n)+row('Heure',(e.svc==='midi'?'Déjeuner':'Dîner')+(e.a!=null?' · '+v102H(e.a)+(e.b!=null?' → '+v102H(e.b):''):''))+row('Couverts',e.n+' pers.');
+  if(ds.length) b+=row('Menu'+(EVLV[e.lv]?' '+EVLV[e.lv].n.toLowerCase():''),ds.join(' · '));
+  if(e.pr>0) b+=row('Prix',fm(e.pr)+' / pers. · total '+fm(e.pr*e.n)+(e.dep?' (acompte '+fm(e.dep)+' encaissé)':''));
+  b+=row('Table / zone',tabs)+'</div></div>'; return b; }
+function v102DayDetail(d){ let b=''; const wk=v102DayWorks(d), ev=v102DayEvents(d), bk=v102DayBook(d);
+  if(wk) b+='<div class="card cardwarn" style="margin:6px 0"><b>'+(wk.move?'🚚 Déménagement':'🏗️ Travaux')+(wk.past?' (terminés)':'')+'</b> · fermeture totale du '+dateShort(wk.start)+' au '+dateShort(wk.end)+'<br><small>'+wk.names.join(' · ')+'</small><br><small class="muted">Ni service ni vente à emporter · seuls les salaires (et la prime des gros travaux) sont payés.</small></div>';
+  for(const e of ev) b+=v102EvDetail(e);
+  for(const e of bk) b+='<div class="card" style="margin:6px 0"><b>📒 '+e.name+'</b><div class="sum"><div class="srow"><span>Type</span><b>'+(EVT[e.kind]?EVT[e.kind].n:'Événement')+'</b></div><div class="srow"><span>Heure</span><b>'+v102H(e.t||1140)+'</b></div><div class="srow"><span>Couverts</span><b>'+(e.size||'?')+' pers.</b></div></div></div>';
+  return b; }
+{ const f=PANELS.cal.f; PANELS.cal.f=function(){ let h=f.apply(this,arguments); try{
+    h=h.replace('<span>🎉 événement</span>','<span>🎉 événement (nom, heure)</span><span>🏗️ travaux</span>');
+    if(CAL.sel!=null){ const d=dayOfSer(CAL.sel); if(d>=1){ const det=v102DayDetail(d); if(det){ const i=h.indexOf('<div class="card"><h3>🏖️ Congés'); const blk='<div class="card"><h3>📌 Au programme · '+dateShort(d)+'</h3>'+det+'</div>'; h=i>=0?h.slice(0,i)+blk+h.slice(i):h+blk; } } }
+  }catch(e){ console.error(e); } return h; }; }
+{ const f=ACT.calsel; ACT.calsel=function(p){ const r=f.apply(this,arguments); try{ const sr=+p, d=dayOfSer(sr); if(CAL.mode==='view'&&d>=1){ const det=v102DayDetail(d); if(det){ const x=ymdS(sr);
+      showPopup({icon:'📅',title:DOWL[x.w].charAt(0).toUpperCase()+DOWL[x.w].slice(1)+' '+x.dd+' '+MOIS[x.m]+(d>=1?' · jour '+d:''),body:det,now:1,choices:[{label:'Fermer',cb(){}}]}); } } }catch(e){ console.error(e); } return r; }; }
+{ const st=document.createElement('style'); st.textContent='.calg>*{min-width:0}.cc{overflow:hidden}.cc .v102ls{display:flex;flex-direction:column;gap:1px;width:100%;min-width:0}.cc .v102l{display:block;width:100%;box-sizing:border-box;font-size:9px;line-height:1.2;font-weight:600;white-space:normal;word-break:break-word;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-align:left;padding:0 2px;border-radius:3px;background:#fff3d1;color:#6b4d0e}.cc .v102l.w{background:#f6dede;color:#8a2c2c}.cc .v102l.p{opacity:.65}.cc .v102m{font-size:8px;color:#8a6d1e;line-height:1}.cc.v102w{background:#fbf0f0}.cc.v102w.past{background:#efe6e6}'; document.head.appendChild(st); }
+/* ---------- Bilan d'un jour de travaux ---------- */
+let V102_LASTW=null;
+{ const f=endDay; endDay=function(){ const T=S.trav, w=!!(T&&worksNow()); const info=w?{veille:dayNum()===T.end,names:v102TItems(T).map(i=>i.e+' '+i.n).join(', '),end:T.end}:null; V102_LASTW=info;
+    const r=f.apply(this,arguments); try{ if(info&&S.summary){ S.summary.v102w=info; } }catch(e){ console.error(e); } return r; }; }
+{ const f=showSummary; showSummary=function(s){ if(!s||!s.w9w) return f.apply(this,arguments); const sp=showPopup; const i=s.v102w||V102_LASTW||{};
+  showPopup=function(o){ try{ if(o&&/^Bilan/.test(o.title||'')){ const ban='<div class="card cardwarn" style="margin:0 0 8px"><b>🏗️ Jour de travaux · fermeture totale</b>'+(i.names?'<br><small>'+i.names+'</small>':'')
+      +'<br><small>Seuls les <b>salaires</b>'+(s.bonus>0?' et la <b>prime travaux</b>':'')+' sont payés : pas de loyer ni d’assurances, pas d’eau, d’électricité ni de gaz, aucune vente (ni sur place ni à emporter). '
+      +(i.veille?'Veille de réouverture : les stocks sont commandés aujourd’hui pour ne manquer de rien demain.':'Aucun achat de marchandises jusqu’à la veille de la réouverture'+(i.end?' ('+dateShort(i.end)+')':'')+'.')+' Les produits frais continuent de se périmer.</small></div>';
+      o.body=ban+(o.body||''); } }catch(e){ console.error(e); } return sp.apply(this,arguments); };
+  try{ return f.apply(this,arguments); } finally { showPopup=sp; } }; }
+/* carte « Fermeture totale » de l'Accueil : noms des chantiers regroupés */
+{ const f=v8TravCard; v8TravCard=function(){ let h=f.apply(this,arguments); try{ if(h) h=h.replace(/\.<\/b>\.<\/p>/g,'.</b></p>'); if(h&&S.trav){ const i=h.indexOf('</p>'); if(i>0) h=h.slice(0,i+4)+'<p style="margin:4px 0"><small>🏗️ Chantier : '+v102TItems(S.trav).map(x=>x.e+' '+x.n).join(' · ')+'</small></p>'+'<p style="margin:4px 0"><small>💶 Seuls les salaires'+(S.trav.prime?' et la prime travaux':'')+' sont payés (ni loyer, ni énergie) ; aucun achat de marchandises avant la veille de la réouverture.</small></p>'+h.slice(i+4); } }catch(e){ console.error(e); } return h; }; }
+
+/* ===== v10.2 w102c.js ===== */
+/* v10.2 c — migration des sauvegardes (travaux en cours / programmés, ventes à emporter prévues, cahier d'événements) */
+const V102_GENERIC=['Anniversaire','Séminaire','Événement','Evenement',''];
+function v102BookToEv(e){ const d=dayNum(); if(!e||e.v102ev||e.v102x) return null; const t=+e.t||1140;
+  if(!(e.day>d||(e.day===d&&minOfDay()<t-60))) return null;
+  if(closedOn(e.day)||v102Wins().some(w=>e.day>=w.start&&e.day<=w.end)){ e.v102x='fermeture'; note('📒 '+(e.name||'Événement')+' du '+dateShort(e.day)+' : le restaurant est fermé ce jour-là, l’événement est annulé (aucun acompte versé).','warn'); return null; }
+  const k=EVT[e.kind]?e.kind:'famille', K=EVT[k], svc=t<900?'midi':'soir';
+  const nm=V102_GENERIC.includes((e.name||'').trim())?EVN[Math.abs(+e.id||0)%EVN.length]:e.name;
+  const ev={id:nid(),k,name:nm,n:Math.max(2,Math.round(+e.size||10)),day:e.day,call:d,exp:d,st:'menu',lv:1,dishes:[null,null,null],pr:0,bud:Math.round((K.bud[0]+K.bud[1])/2),rounds:0,dep:0,svc,
+    a:svc==='midi'?clamp(t,690,840):clamp(t,1110,1290),b:svc==='midi'?15*60+30:23*60,v102book:e.id,note:e.note||''};
+  try{ evPropose(ev); }catch(x){ console.error(x); }
+  ev.st='booked'; ev.pr=Math.max(ev.bud,Math.ceil(evCostPP(ev)*1.2)); EV().push(ev); e.v102ev=ev.id; return ev; }
+function v102Migrate(S0){ S0=S0||S; if(!S0) return 0; S0.pw=S0.pw||{}; const first=!S0.pw.v102; let n=0;
+  const T=S0.trav; if(T){ if(!T.kitchen){ T.kitchen=true; n++; } if(T.prime==null) T.prime=0; if(!T.days&&T.end>=T.start) T.days=T.end-T.start+1; }
+  const W=S0.wk; if(W){ if(W.pre){ let k=0; for(const x in W.pre) k+=(W.pre[x]||[]).length; if(k&&first) note('📞 v10.2 : plus de vente à emporter pendant les travaux, '+k+' commande(s) à emporter prévue(s) annulée(s).','info'); W.pre={}; }
+    if(first&&W.ann){ W.annE=W.annE||{}; for(const x in W.ann) W.annE[x]=-1; } }   /* l'annonce Piaf sera rectifiée (fermeture totale) au prochain matin */
+  if(first&&S0.day_n!==0){ for(const e of (S0.evtBook||[])){ try{ if(v102BookToEv(e)) n++; }catch(x){ console.error(x); } } }
+  S0.pw.v102=1; return n; }
+{ const f=fixSave; fixSave=function(){ const r=f.apply(this,arguments); try{ if(S&&S.pw&&dayNum()>=1) v102Migrate(S); }catch(e){ console.error(e); } return r; }; }
+window.V102={wins:v102Wins,busy:v102Busy,migrate:v102Migrate,detail:v102DayDetail,join:v102Join,bookToEv:v102BookToEv};
 
 window.__bistrot={get S(){return S;}, R, SC, simDay:(cb)=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ if(S.awaitNext) nextDay(); let g=0; while(!S.awaitNext&&!S.over&&g++<20000){ step(STEP); if(cb&&g%5===0) cb(); } }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } return S.summary; }, sim:m=>{ const o={p:H.popup,s:H.summary,n:H.notify,i:H.interactive}; H.popup=()=>{}; H.summary=()=>{}; H.notify=()=>{}; H.interactive=false; try{ simulate(m); }finally{ H.popup=o.p; H.summary=o.s; H.notify=o.n; H.interactive=o.i; } renderTab(true); updateHeader(); }, save, load:loadGame, ui, step, nextDay:()=>{ nextDay(); renderTab(true); }, restart, placeAll, A:{seat:A_seat,join:A_join,split:A_split,cash:A_cash,prompt:A_prompt,resAccept:A_resAccept,trainAttr:A_trainAttr,trainSkill:A_trainSkill,auto:A_auto,take:A_take,refuse:A_refuse,qLimit:A_qLimit,hire:A_hire,fire:A_fire,shift:A_shift,planOff:A_planOff,replan:A_replan,apprDecision:A_apprDecision,mdjSet:A_mdjSet,mdjPrice:A_mdjPrice,mdjOn:A_mdjOn,mdjTop:A_mdjTop,qMax:A_qMax,qWait:A_qWait,staffOrder:A_staffOrder,loan:A_loan,repayDaily:A_repayDaily,repayNow:A_repayNow,post:A_post,showAl:A_showAl,showOrig:A_showOrig,price:A_price,wage:A_wage,rest:A_rest}, lambda, serveDone, TYP, typedSet, typedApply, phaseOf, avail, onDuty, segOf, kitchenOpen, acceptsArrivals, queueList, worksSvc, SHIFTS, replanOff, needsOff, fm, takeDish, womRecord, socDaily, womDaily, minOfDay, endDay, mdjGen, estWait, laneOf, laneGroups, laneInfo, smStart, smTick, smSeatOf, resTick, planSeating, deliver, MDJ_F, MDJ_IDS, mdjOpen, mdjRemain, comeBackTick, mdjMaxN, qLayout, newState, loansRem, womMult, socMult, absentDay, coverAlerts, alerts, ACT, viewStaff, mdjActive, genCandidates, relayoutTables, tvStep, visGeom, tgtGeom, placeOrder, supPrice, clusterOf, hit:hitTest, newGroup, layout, DISH, ING, tapAt, renderStrip, stripHTML, G, REG, genResReqs, endDay, fixSave};
 window.addEventListener('error',e=>{ console.error('JS error:',e.message); });
